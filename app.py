@@ -1,5 +1,5 @@
 import streamlit as st
-import google.generativeai as genai
+from google import genai  # 👈 新しいライブラリの読み込み方に変更
 import time
 import os
 import mimetypes
@@ -38,10 +38,10 @@ if uploaded_file is not None:
         if not mime_type:
             mime_type = "audio/mpeg"
 
-        # 💡 【重要】AQ. から始まるキーでも正常に動くクライアント接続を確立する
+        # 💡 最新の AQ. キーに完全対応したクライアントを起動
         client = genai.Client(api_key=api_key)
 
-        # ファイルのアップロード（最新のクライアント経由で実行）
+        # ファイルのアップロード
         st.write("ファイルをGoogleのサーバーへ転送中...")
         audio_file = client.files.upload(file="temp_audio", mime_type=mime_type)
         
