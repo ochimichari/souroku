@@ -1,5 +1,6 @@
 import streamlit as st
-from google import genai  # 👈 新しいライブラリの読み込み方に変更
+from google import genai
+from google.genai import types  # 👈 設定用の部品を新しく追加
 import time
 import os
 import mimetypes
@@ -38,12 +39,16 @@ if uploaded_file is not None:
         if not mime_type:
             mime_type = "audio/mpeg"
 
-        # 💡 最新の AQ. キーに完全対応したクライアントを起動
+        # 最新の AQ. キーに対応したクライアントを起動
         client = genai.Client(api_key=api_key)
 
-        # ファイルのアップロード
         st.write("ファイルをGoogleのサーバーへ転送中...")
-        audio_file = client.files.upload(file="temp_audio", mime_type=mime_type)
+        
+        # 💡 【修正点】 mime_type を config の中に正しくカプセル化して指定する
+        audio_file = client.files.upload(
+            file="temp_audio", 
+            config=types.UploadFileConfig(mime_type=mime_type)
+        )
         
         # アップロード完了を待つループ
         while audio_file.state.name == "PROCESSING":
