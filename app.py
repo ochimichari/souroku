@@ -1,6 +1,6 @@
 import streamlit as st
 from google import genai
-from google.genai import types  # 👈 設定用の部品を新しく追加
+from google.genai import types
 import time
 import os
 import mimetypes
@@ -8,22 +8,29 @@ import mimetypes
 st.title("楽団合奏 指揮者コメント抽出アプリ")
 st.write("30分以上の合奏音源から、指揮者の発言だけをタイムスタンプ付きで抽出します。")
 
-# 🔒 身内用の簡易パスワード設定
+# 🔒 画面の左側に入力欄を作成（セキュリティ対策）
+st.sidebar.header("🔑 セキュリティ設定")
 password_input = st.sidebar.text_input("楽団の合言葉を入力してください", type="password")
 
+# 💡 【重要】利用者が各自の画面から自分のAPIキーを入力する欄
+api_key_input = st.sidebar.text_input("ご自身のGemini APIキーを入力してください", type="password")
+
+# 1. まず合言葉のチェック
+# ※「いつもの合言葉」の部分を、楽団のメンバーだけが知っている好きな言葉に変えてください
 if password_input != "いつもの合言葉":
     st.warning("左側のメニューに正しい「楽団の合言葉」を入力してください。")
     st.stop()
 
-# 🔑 SecretsからAPIキーを取得
-if "GEMINI_API_KEY" in st.secrets:
-    api_key = st.secrets["GEMINI_API_KEY"]
-else:
-    st.error("Streamlitの管理画面（Secrets）にAPIキーが設定されていません。")
+# 2. 次に利用者自身のAPIキーのチェック
+if not api_key_input:
+    st.info("左側のメニューに「ご自身のGemini APIキー」を入力してください。")
     st.stop()
+else:
+    # 利用者が入力したキーを変数にセット
+    api_key = api_key_input
 
 # ----------------------------------------------------
-# 音声処理
+# 音声処理（ここから下は変更なし）
 # ----------------------------------------------------
 uploaded_file = st.file_uploader("音声ファイルをアップロードしてください (mp3, wav, m4aなど)", type=["mp3", "wav", "m4a"])
 
@@ -39,12 +46,12 @@ if uploaded_file is not None:
         if not mime_type:
             mime_type = "audio/mpeg"
 
-        # 最新の AQ. キーに対応したクライアントを起動
+        # 利用者が入力したキーを使ってクライアントを起動（AQ.キーにも完全対応）
         client = genai.Client(api_key=api_key)
 
         st.write("ファイルをGoogleのサーバーへ転送中...")
         
-        # 💡 【修正点】 mime_type を config の中に正しくカプセル化して指定する
+        # mime_type を config の中に指定してアップロード
         audio_file = client.files.upload(
             file="temp_audio", 
             config=types.UploadFileConfig(mime_type=mime_type)
