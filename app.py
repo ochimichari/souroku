@@ -2,6 +2,7 @@ import streamlit as st
 import google.generativeai as genai
 import time
 import os
+import mimetypes
 
 # 1. Gemini APIの設定（APIキーは環境変数から読み込むか、ここに直接記述）
 GOOGLE_API_KEY = "AIzaSyDrpDwlWIjBGlWGhX-Pvp9159rQSg327HI"
@@ -21,8 +22,14 @@ if uploaded_file is not None:
         f.write(uploaded_file.getbuffer())
         
     try:
-        # 3. GeminiのFile APIを使って音声をアップロード
-        audio_file = genai.upload_file(path="temp_audio")
+        # 3. ファイル形式（MIMEタイプ）を拡張子から自動判別する
+        mime_type, _ = mimetypes.guess_type(uploaded_file.name)
+        if not mime_type:
+            # 判別できない場合のセーフティとして、一般的なオーディオ形式を指定
+            mime_type = "audio/mpeg"
+
+# mime_type引数を追加してアップロードを実行
+audio_file = genai.upload_file(path="temp_audio", mime_type=mime_type)
         
         # アップロード完了を待つループ
         while audio_file.state.name == "PROCESSING":
