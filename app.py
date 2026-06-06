@@ -4,12 +4,11 @@ import time
 import os
 import mimetypes
 
-# 1. Gemini APIの設定（APIキーは環境変数から読み込むか、ここに直接記述）
+# 1. Gemini APIの設定
 GOOGLE_API_KEY = "AIzaSyDrpDwlWIjBGlWGhX-Pvp9159rQSg327HI"
 genai.configure(api_key=GOOGLE_API_KEY)
 
 st.title("楽団合奏 指揮者コメント抽出アプリ")
-st.write("30分以上の合奏音源から、指揮者の発言だけをタイムスタンプ付きで抽出します。")
 
 # 2. ファイルアップローダーの設置
 uploaded_file = st.file_uploader("音声ファイルをアップロードしてください (mp3, wav, m4aなど)", type=["mp3", "wav", "m4a"])
@@ -25,11 +24,10 @@ if uploaded_file is not None:
         # 3. ファイル形式（MIMEタイプ）を拡張子から自動判別する
         mime_type, _ = mimetypes.guess_type(uploaded_file.name)
         if not mime_type:
-            # 判別できない場合のセーフティとして、一般的なオーディオ形式を指定
             mime_type = "audio/mpeg"
 
-　　　　# mime_type引数を追加してアップロードを実行
-　　　　audio_file = genai.upload_file(path="temp_audio", mime_type=mime_type)
+        # mime_type引数を追加してアップロードを実行
+        audio_file = genai.upload_file(path="temp_audio", mime_type=mime_type)
         
         # アップロード完了を待つループ
         while audio_file.state.name == "PROCESSING":
