@@ -4,11 +4,31 @@ import time
 import os
 import mimetypes
 
-# 1. Gemini APIの設定
-GOOGLE_API_KEY = "AIzaSyDrpDwlWIjBGlWGhX-Pvp9159rQSg327HI"
-genai.configure(api_key=GOOGLE_API_KEY)
-
 st.title("楽団合奏 指揮者コメント抽出アプリ")
+st.write("30分以上の合奏音源から、指揮者の発言だけをタイムスタンプ付きで抽出します。")
+
+# 🔒 画面の左側にAPIキーと合言葉の入力欄を作る（セキュリティ対策）
+st.sidebar.header("🔑 セキュリティ設定")
+api_key_input = st.sidebar.text_input("Gemini APIキーを入力してください", type="password")
+password_input = st.sidebar.text_input("楽団の合言葉を入力してください", type="password")
+
+# 合言葉のチェック（身内以外に勝手に使われないようにする設定）
+# 「いつもの合言葉」の部分を、楽団のメンバーだけが知っている好きな言葉に変えてください
+if password_input != "いつもの合言葉":
+    st.warning("左側のメニューに正しい「楽団の合言葉」を入力してください。")
+    st.stop()
+
+# APIキーのチェック
+if not api_key_input:
+    st.info("左側のメニューに「Gemini APIキー」を入力してください。")
+    st.stop()
+else:
+    # 入力されたキーをシステムに適用
+    genai.configure(api_key=api_key_input)
+
+# ----------------------------------------------------
+# ここから下は通常の処理（APIキーが正しく入力されたら動く）
+# ----------------------------------------------------
 
 # 2. ファイルアップローダーの設置
 uploaded_file = st.file_uploader("音声ファイルをアップロードしてください (mp3, wav, m4aなど)", type=["mp3", "wav", "m4a"])
