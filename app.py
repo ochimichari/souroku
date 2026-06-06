@@ -28,8 +28,8 @@ if uploaded_file is not None:
             # 判別できない場合のセーフティとして、一般的なオーディオ形式を指定
             mime_type = "audio/mpeg"
 
-# mime_type引数を追加してアップロードを実行
-audio_file = genai.upload_file(path="temp_audio", mime_type=mime_type)
+　　　　# mime_type引数を追加してアップロードを実行
+　　　　audio_file = genai.upload_file(path="temp_audio", mime_type=mime_type)
         
         # アップロード完了を待つループ
         while audio_file.state.name == "PROCESSING":
