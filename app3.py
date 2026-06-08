@@ -2,14 +2,14 @@ import os
 import streamlit as st
 import streamlit.components.v1 as components
 
-# 1. 画面全体の表示設定（ワイドモード、タイトル非表示の土台作り）
+# 1. 画面全体の表示設定
 st.set_page_config(
     page_title="奏録 / SOUROKU Web",
     layout="centered",
     initial_sidebar_state="collapsed"
 )
 
-# Streamlit標準のヘッダー・フッター・余白を強制的に非表示にするCSS
+# Streamlit標準の余白を強制的に消すCSS
 st.markdown("""
     <style>
         #MainMenu {visibility: hidden;}
@@ -31,27 +31,8 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# 2. 静的ファイル（音声やテキスト）をブラウザへ直接配信するための設定
-import tornado.web
-from streamlit.web.server.server import Server
-
-def add_static_route():
-    try:
-        server = Server.get_current()
-        if server and server._tornado_app:
-            data_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "data"))
-            for handler in server._tornado_app.handlers:
-                if "static/data/" in str(handler.regex):
-                    return
-            server._tornado_app.add_handlers(r".*", [
-                (r"/static/data/(.*)", tornado.web.StaticFileHandler, {"path": data_dir})
-            ])
-    except Exception as e:
-        pass
-
-add_static_route()
-
-# 3. 移植するHTML/CSS/JSコードの組み立て
+# 2. 移植するHTML/CSS/JSコードの組み立て
+# Streamlitの公式仕様に合わせ、静的ファイルパスを「app/static/...」に修正します
 html_content = """
 <!DOCTYPE html>
 <html lang="ja">
@@ -62,24 +43,17 @@ html_content = """
     <style>
         * { box-sizing: border-box; }
         body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; margin: 0; padding: 0; background: #0c0e12; color: #f0f2f5; display: flex; justify-content: center; height: 100vh; overflow: hidden; }
-        
         .container { width: 100%; max-width: 480px; height: 100vh; background: #0c0e12; padding: 16px; display: flex; flex-direction: column; overflow: hidden; }
-        
         .fixed-header-panel { display: flex; flex-direction: column; flex-shrink: 0; background: #0c0e12; z-index: 10; }
-
         h3 { margin: 5px 0 15px 0; color: #00d2ff; text-align: center; font-size: 18px; font-weight: bold; letter-spacing: 0.5px; border-bottom: 1px solid #1a1e26; padding-bottom: 10px; }
-        
         .selector-panel { background: #131722; padding: 12px; border-radius: 8px; border: 1px solid #1e2433; margin-bottom: 12px; }
         .panel-title { font-size: 14px; font-weight: bold; color: #00d2ff; margin-bottom: 8px; padding-left: 4px; border-left: 3px solid #00d2ff; }
         select { width: 100%; padding: 12px; font-size: 14px; border-radius: 6px; border: 1px solid #2a3247; background: #1c2230; color: #fff; font-weight: bold; outline: none; }
-
         .player-panel { background: #131722; padding: 12px; border-radius: 8px; border: 1px solid #00d2ff; box-shadow: 0 0 10px rgba(0,210,255,0.2); margin-bottom: 12px; display: flex; flex-direction: column; gap: 6px; }
         audio { width: 100%; height: 38px; filter: invert(90%) hue-rotate(180deg); }
         .time-display { font-family: monospace; font-size: 13px; font-weight: bold; text-align: right; padding-right: 4px; color: #00d2ff; }
-
         .timeline-container { width: 100%; margin-bottom: 15px; height: 35px; }
         canvas { width: 100%; height: 100%; background: #131722; border-radius: 6px; cursor: pointer; display: block; border: 1px solid #1e2433; }
-
         .log-header-container { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
         .log-header-title { font-size: 14px; font-weight: bold; color: #00d2ff; padding-left: 4px; border-left: 3px solid #00d2ff; }
         .btn-group { display: flex; gap: 6px; }
@@ -87,36 +61,28 @@ html_content = """
         .btn-edit { background: #00d2ff; color: #0c0e12; }
         .btn-edit.editing { background: #4caf50; color: #fff; }
         .btn-setting { background: #1e2433; color: #8892b0; border: 1px solid #2a3247; }
-        
         .editor-container { border: 1px solid #1e2433; border-radius: 8px; flex: 1; overflow-y: auto; background: #131722; -webkit-overflow-scrolling: touch; padding: 4px; }
         .line { padding: 14px 12px; border-bottom: 1px solid #1c2230; font-size: 13.5px; line-height: 1.6; cursor: pointer; color: #cdd4e0; -webkit-tap-highlight-color: transparent; transition: background 0.1s; display: flex; align-items: center; }
         .line:hover { background: #1c2230; }
-        
         .edit-input { width: 100%; padding: 6px 10px; font-size: 13.5px; background: #1c2230; border: 1px solid #00d2ff; color: #fff; border-radius: 4px; outline: none; font-family: inherit; }
-        
         .highlight { background: #1c2c42 !important; font-weight: bold; color: #fff; border-left: 5px solid #00d2ff; padding-left: 7px; }
     </style>
 </head>
 <body>
-
 <div class="container">
     <div class="fixed-header-panel">
         <h3>奏録 / SOUROKU</h3>
-        
         <div class="selector-panel">
             <div class="panel-title">Select session</div>
             <select id="folder-selector" onchange="changeFolder(this.value)"></select>
         </div>
-        
         <div class="player-panel">
             <audio id="audio" controls></audio>
             <div class="time-display" id="time-display">00:00 / 00:00</div>
         </div>
-
         <div class="timeline-container">
             <canvas id="timeline-canvas"></canvas>
         </div>
-        
         <div class="log-header-container">
             <div class="log-header-title">Session Logs</div>
             <div class="btn-group">
@@ -125,13 +91,12 @@ html_content = """
             </div>
         </div>
     </div>
-
     <div class="editor-container" id="editor">
         <div style="color: #64748b; text-align: center; padding-top: 60px; font-size:13px;">データを読み込み中...</div>
     </div>
 </div>
 """
-# 前半パートの変数 html_content の末尾に文字列を追加します
+# 1回目の変数 html_content の末尾に文字列を追加します
 html_content += """
 <script>
     const audio = document.getElementById('audio');
@@ -166,7 +131,8 @@ html_content += """
     }
 
     function loadFolderList() {
-        fetch('static/data/list.txt?nocache=' + new Date().getTime())
+        // Streamlit公式の静的配信URL「app/static/...」から読み込みます
+        fetch('app/static/list.txt?nocache=' + new Date().getTime())
             .then(res => { if (!res.ok) throw new Error(); return res.text(); })
             .then(rawText => {
                 selector.innerHTML = '';
@@ -180,12 +146,12 @@ html_content += """
                 if (folders.length > 0) changeFolder(folders[0]);
             })
             .catch(err => {
-                editor.innerHTML = `<div style="color:#ef5350; text-align:center; padding-top:40px; font-size:13px;">static/data/list.txt が見つかりません。</div>`;
+                editor.innerHTML = `<div style="color:#ef5350; text-align:center; padding-top:40px; font-size:13px;">.streamlit/static/list.txt が見つかりません。</div>`;
             });
     }
 
     function fallbackFetch(folderName, fileName) {
-        fetch(`static/data/${folderName}/${fileName}.txt?nocache=` + new Date().getTime())
+        fetch(`app/static/${folderName}/${fileName}.txt?nocache=` + new Date().getTime())
             .then(res => { if (!res.ok) throw new Error(); return res.text(); })
             .then(textRaw => {
                 parseText(textRaw);
@@ -262,7 +228,7 @@ html_content += """
         timeDisplay.innerText = `${curM}:${curS} / ${totM}:${totS}`;
     }
 """
-# 後半パート①の変数 html_content の末尾にさらに文字列を追加し、最後に描画します
+# 中盤パートの変数 html_content の末尾にさらに文字列を追加し、最後に描画します
 html_content += """
     function changeFolder(folderName) {
         audio.pause();
@@ -286,10 +252,10 @@ html_content += """
             fileName = parts[parts.length - 1];
         }
         
-        audio.src = `static/data/${folderName}/${fileName}.m4a`;
+        audio.src = `app/static/${folderName}/${fileName}.m4a`;
         audio.load();
 
-        fetch(`static/data/${folderName}/${fileName}_color.txt?nocache=` + new Date().getTime())
+        fetch(`app/static/${folderName}/${fileName}_color.txt?nocache=` + new Date().getTime())
             .then(res => { if (!res.ok) throw new Error(); return res.text(); })
             .then(colorRaw => {
                 parseColor(colorRaw);
@@ -408,6 +374,7 @@ html_content += """
                 const parts = currentLoadedFolder.split('_');
                 fileName = parts[parts.length - 1];
             }
+            // ※ GitHub APIで上書きする際のリポジトリ内パスは元の「data/...」のままにします
             const path = `data/${currentLoadedFolder}/${fileName}.txt`;
 
             const u8array = new TextEncoder().encode(fullText);
@@ -489,4 +456,3 @@ html_content += """
 
 # Streamlitの画面にコンポーネントとして埋め込み
 components.html(html_content, height=1000, scrolling=False)
-
