@@ -32,7 +32,6 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # 2. 移植するHTML/CSS/JSコードの組み立て
-# Streamlitの公式仕様に合わせ、静的ファイルパスを「app/static/...」に修正します
 html_content = """
 <!DOCTYPE html>
 <html lang="ja">
@@ -115,6 +114,9 @@ html_content += """
     let currentLoadedFolder = "";
     let currentFileSha = ""; 
 
+    // 環境に依存する静的ファイルのルートパス（app/static/ か static/ を自動判別）
+    let staticRoot = "static/";
+
     function resizeCanvas() {
         canvas.width = canvas.parentElement.clientWidth;
         canvas.height = canvas.parentElement.clientHeight;
@@ -131,27 +133,40 @@ html_content += """
     }
 
     function loadFolderList() {
-        // Streamlit公式の静的配信URL「app/static/...」から読み込みます
-        fetch('app/static/list.txt?nocache=' + new Date().getTime())
-            .then(res => { if (!res.ok) throw new Error(); return res.text(); })
-            .then(rawText => {
-                selector.innerHTML = '';
-                const folders = rawText.split('\\n').map(f => f.trim()).filter(f => f.length > 0);
-                folders.forEach(folder => {
-                    const opt = document.createElement('option');
-                    opt.value = folder;
-                    opt.innerText = folder.replace(/_/g, ' ');
-                    selector.appendChild(opt);
-                });
-                if (folders.length > 0) changeFolder(folders[0]);
+        // まずは標準の static/ から試します
+        fetch(staticRoot + 'list.txt?nocache=' + new Date().getTime())
+            .then(res => {
+                if (!res.ok) throw new Error();
+                return res.text();
             })
-            .catch(err => {
-                editor.innerHTML = `<div style="color:#ef5350; text-align:center; padding-top:40px; font-size:13px;">.streamlit/static/list.txt が見つかりません。</div>`;
+            .then(rawText => { processFolderList(rawText); })
+            .catch(() => {
+                // 失敗した場合は、Streamlit内部の別ルート app/static/ でリトライします
+                staticRoot = "app/static/";
+                fetch(staticRoot + 'list.txt?nocache=' + new Date().getTime())
+                    .then(res => { if (!res.ok) throw new Error(); return res.text(); })
+                    .then(rawText => { processFolderList(rawText); })
+                    .catch(() => {
+                        editor.innerHTML = `<div style="color:#ef5350; text-align:center; padding-top:40px; font-size:13px;">.streamlit/static/list.txt を読み込めませんでした。<br>配置場所を確認してください。</div>`;
+                    });
             });
     }
 
+    function processFolderList(rawText) {
+        selector.innerHTML = '';
+        const folders = rawText.split('\\n').map(f => f.trim()).filter(f => f.length > 0);
+        folders.forEach(folder => {
+            const opt = document.createElement('option');
+            opt.value = folder;
+            opt.innerText = folder.replace(/_/g, ' ');
+            selector.appendChild(opt);
+        });
+        // 【修正】配列全体ではなく、最初の要素（folders[0]）を渡すように直しました
+        if (folders.length > 0) changeFolder(folders[0]);
+    }
+
     function fallbackFetch(folderName, fileName) {
-        fetch(`app/static/${folderName}/${fileName}.txt?nocache=` + new Date().getTime())
+        fetch(`${staticRoot}${folderName}/${fileName}.txt?nocache=` + new Date().getTime())
             .then(res => { if (!res.ok) throw new Error(); return res.text(); })
             .then(textRaw => {
                 parseText(textRaw);
@@ -252,10 +267,10 @@ html_content += """
             fileName = parts[parts.length - 1];
         }
         
-        audio.src = `app/static/${folderName}/${fileName}.m4a`;
+        audio.src = `${staticRoot}${folderName}/${fileName}.m4a`;
         audio.load();
 
-        fetch(`app/static/${folderName}/${fileName}_color.txt?nocache=` + new Date().getTime())
+        fetch(`${staticRoot}${folderName}/${fileName}_color.txt?nocache=` + new Date().getTime())
             .then(res => { if (!res.ok) throw new Error(); return res.text(); })
             .then(colorRaw => {
                 parseColor(colorRaw);
@@ -374,7 +389,6 @@ html_content += """
                 const parts = currentLoadedFolder.split('_');
                 fileName = parts[parts.length - 1];
             }
-            // ※ GitHub APIで上書きする際のリポジトリ内パスは元の「data/...」のままにします
             const path = `data/${currentLoadedFolder}/${fileName}.txt`;
 
             const u8array = new TextEncoder().encode(fullText);
