@@ -172,7 +172,7 @@ if folders:
         <div class="editor-container" id="editor">読み込み中...</div>
     </div>
     # 3-Aのhtml_codeの末尾にJavaScriptを追加
-    html_code += f"""
+html_code += f"""
     <script>
         const audio = document.getElementById('audio');
         const canvas = document.getElementById('timeline-canvas');
