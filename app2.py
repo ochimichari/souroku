@@ -12,7 +12,7 @@ from google.genai import types
 # 画面設定
 st.set_page_config(layout="centered", page_title="奏録 / SOUROKU Web版")
 
-# 安全なGitHub URLの定義（表示バグ対策）
+# 安全なGitHub URLの定義
 API_SCHEME = "https"
 API_HOST = "://github.com"
 repo_clean = st.secrets['GITHUB_REPO'].strip().strip("/")
@@ -47,7 +47,8 @@ def save_github_file(path, text, sha=None):
         payload["sha"] = sha
     try:
         res = requests.put(url, headers=HEADERS, json=payload, timeout=10)
-        return res.status_code in
+        # 💡 [200, 201] の記述漏れを完全に修正しました
+        return res.status_code in [200, 201]
     except Exception:
         return False
 
@@ -68,6 +69,7 @@ def update_learning_dictionary(old_text, new_text):
                     dictionary.append({"wrong": o_msg, "correct": n_msg})
                     
     save_github_file("data/learning_dict.json", json.dumps(dictionary, ensure_ascii=False, indent=2), dict_sha)
+
 # メイン画面初期読み込み
 list_raw, _ = get_github_file("data/list.txt")
 folders = [f.strip() for f in list_raw.split('\n') if f.strip()] if list_raw else []
