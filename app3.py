@@ -115,7 +115,7 @@ html_content += """
     let currentFileSha = ""; 
 
     // 環境に依存する静的ファイルのルートパス（app/static/ か static/ を自動判別）
-    let staticRoot = "static/";
+    let staticRoot = "";
 
     function resizeCanvas() {
         canvas.width = canvas.parentElement.clientWidth;
