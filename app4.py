@@ -1,7 +1,7 @@
 import streamlit as st
 import streamlit.components.v1 as components
 
-st.title("fetch単体 動作検証コード")
+st.title("fetch単体 動作検証（appなしルート）")
 
 html_code = """
 <div style="padding:20px; background:#131722; color:#00d2ff; border-radius:8px;">
@@ -10,17 +10,17 @@ html_code = """
 </div>
 
 <script>
-    // 現在のページURL（ドメイン）を自動で取得して絶対パスを組み立てる
-    const domain = window.location.origin;
-    const targetUrl = domain + '/app/static/test.txt?nocache=' + new Date().getTime();
-
-    // ログ出力してfetch開始
-    console.log("リクエスト先:", targetUrl);
+    // 【重要】app/ を排除し、正しい絶対パス /static/ を指定します
+    const targetUrl = '/static/test.txt?nocache=' + new Date().getTime();
 
     fetch(targetUrl)
         .then(res => {
-            console.log("ステータス:", res.status);
-            if (!res.ok) throw new Error("通信に失敗しました。ステータスコード: " + res.status);
+            // ここで中身がHTML（Streamlitの画面）になっていないかチェック
+            const contentType = res.headers.get("content-type");
+            if (contentType && contentType.includes("text/html")) {
+                throw new Error("404エラーの代わりにStreamlitのHTML画面が返ってきてしまいました。パスが間違っています。");
+            }
+            if (!res.ok) throw new Error("通信に失敗しました。ステータス: " + res.status);
             return res.text();
         })
         .then(textData => {
