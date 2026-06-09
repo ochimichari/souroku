@@ -1,67 +1,46 @@
 import os
+import glob
+import json
 import streamlit as st
 import streamlit.components.v1 as components
 
-# 画面全体の表示設定
-st.set_page_config(
-    page_title="奏録 / SOUROKU Web",
-    layout="centered",
-    initial_sidebar_state="collapsed"
-)
+st.set_page_config(page_title="奏録 / SOUROKU Web", layout="centered", initial_sidebar_state="collapsed")
 
-# Streamlit標準の余白を強制的に消すCSS
-st.markdown("""
-    <style>
-        #MainMenu {visibility: hidden;}
-        footer {visibility: hidden;}
-        header {visibility: hidden;}
-        .block-container {
-            padding-top: 0px !important;
-            padding-bottom: 0px !important;
-            padding-left: 0px !important;
-            padding-right: 0px !important;
-            max-width: 100% !important;
-        }
-        iframe {
-            display: block;
-            border: none;
-            width: 100vw;
-            height: 100vh;
-        }
-    </style>
-""", unsafe_allow_html=True)
+# 1. サーバー内のデータを全てスキャンして辞書にまとめる
+all_data = {}
+session_list = []
 
-# --------------------------------------------------------------------
-# データの読み込み処理
-# --------------------------------------------------------------------
-# ① list.txt の読み込み
-list_data = ""
-possible_paths = ["list.txt", "static/list.txt", ".streamlit/static/list.txt"]
-for path in possible_paths:
-    if os.path.exists(path):
-        try:
-            with open(path, "r", encoding="utf-8") as f:
-                list_data = f.read()
-            break
-        except Exception:
-            pass
+# list.txtの読み込み
+if os.path.exists("list.txt"):
+    with open("list.txt", "r", encoding="utf-8") as f:
+        session_list = [line.trim() for line in f if line.trim()]
 
-if not list_data:
-    list_data = "読み込みエラー\nlist.txtが配置されていません"
+# 各セッションのテキストデータを先読み
+for folder in session_list:
+    file_name = folder.split('_')[-1] if '_' in folder else folder
+    all_data[folder] = {"color": "", "text": ""}
+    
+    # カラーファイルの読み込み
+    c_path = f"static/{folder}/{file_name}_color.txt"
+    if os.path.exists(c_path):
+        with open(c_path, "r", encoding="utf-8") as f:
+            all_data[folder]["color"] = f.read()
+            
+    # ログファイルの読み込み
+    t_path = f"static/{folder}/{file_name}.txt"
+    if os.path.exists(t_path):
+        with open(t_path, "r", encoding="utf-8") as f:
+            all_data[folder]["text"] = f.read()
 
-# 特殊文字のエスケープ処理
-list_data_escaped = list_data.replace("`", "\\`").replace("$", "\\$")
+# JavaScriptで安全に読めるようにJSON文字列化
+json_data = json.dumps(all_data, ensure_ascii=False)
+json_list = json.dumps(session_list, ensure_ascii=False)
 
-# ② 分割したHTMLファイルの読み込み
+# 2. HTMLテンプレートの読み込みと埋め込み
 html_template = ""
 if os.path.exists("index.html"):
     with open("index.html", "r", encoding="utf-8") as f:
         html_template = f.read()
-else:
-    html_template = "<h3>エラー: index.html が見つかりません。</h3>"
 
-# HTMLのプレースホルダー「__LIST_DATA__」を実際のテキストに置き換える
-full_html = html_template.replace("__LIST_DATA__", list_data_escaped)
-
-# Streamlitの画面にコンポーネントとして埋め込み
+full_html = html_template.replace("__JSON_DATA__", json_data).replace("__JSON_LIST__", json_list)
 components.html(full_html, height=1000, scrolling=False)
