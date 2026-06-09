@@ -214,20 +214,44 @@
         currentLoadedFolder = folderName;
         currentFileSha = ""; 
 
-        let fileName = folderName;
-        if (folderName.includes('_')) {
-            const parts = folderName.split('_');
-            fileName = parts[parts.length - 1];
-        }
+        let fileName = folderName.includes('_') ? folderName.split('_').pop() : folderName;
         
+        // 音声ファイルの読み込みパスを適用
         audio.src = staticRoot + folderName + '/' + fileName + '.m4a';
         audio.load();
 
-        fetchColorFile("app/static/", folderName, fileName)
-            .catch(() => {
-                fetchColorFile("static/", folderName, fileName)
-                    .catch(() => { logLoadError(); });
-            });
+        // ★修正：サーバー内のテキストはPythonが持っているため、ここでのfetchは完全にゼロになりました
+        const targetData = serverData[folderName];
+        if (targetData) {
+            parseColor(targetData.color);
+            
+            // GitHubから最新の編集履歴を引っ張る処理（無ければPythonの先読みテキストを使用）
+            const repo = (localStorage.getItem('git_repo') || "").trim();
+            const token = (localStorage.getItem('git_token') || "").trim();
+            const path = 'data/' + folderName + '/' + fileName + '.txt';
+            
+            if (repo && token) {
+                const apiDomain = ["https:", "", "://github.com", "repos", ""].join("/");
+                fetch(apiDomain + repo + "/contents/" + path, {
+                    headers: { "Authorization": "Bearer " + token, "Accept": "application/vnd.github+json" }
+                })
+                .then(res => { if (!res.ok) throw new Error(); return res.json(); })
+                .then(json => {
+                    currentFileSha = json.sha;
+                    const binaryString = atob(json.content.replace(/\s/g, ''));
+                    const bytes = new Uint8Array(binaryString.length);
+                    for (let i = 0; i < binaryString.length; i++) { bytes[i] = binaryString.charCodeAt(i); }
+                    parseText(new TextDecoder('utf-8').decode(bytes));
+                    resizeCanvas();
+                })
+                .catch(() => { parseText(targetData.text); resizeCanvas(); });
+            } else {
+                parseText(targetData.text);
+                resizeCanvas();
+            }
+        } else {
+            editor.innerHTML = `<div style="color:#ef5350; text-align:center; padding-top:40px; font-size:13px;">セッションデータが見つかりません。</div>`;
+        }
     }
 
     function fetchColorFile(rootPath, folderName, fileName) {
