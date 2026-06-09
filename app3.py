@@ -1,9 +1,8 @@
 import os
 import json
 import streamlit as st
-import streamlit.components.v1 as components
 
-# 画面全体の表示設定
+# 1. 画面全体の表示設定
 st.set_page_config(
     page_title="奏録 / SOUROKU Web",
     layout="centered",
@@ -33,7 +32,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # --------------------------------------------------------------------
-# サーバー内の全テキストデータをPython側で安全に先読み（fetchを完全回避）
+# サーバー内の全テキストデータをPython側で安全に先読み
 # --------------------------------------------------------------------
 all_data = {}
 session_list = []
@@ -75,5 +74,7 @@ else:
 # プレースホルダーを実際のJSON文字列に置換
 full_html = html_template.replace("__JSON_DATA__", json_data).replace("__JSON_LIST__", json_list)
 
-# 画面にコンポーネントとして埋め込み
-components.html(full_html, height=1000, scrolling=False)
+# --------------------------------------------------------------------
+# 【2026年最新修正】廃止された components.html を st.iframe に変更
+# --------------------------------------------------------------------
+st.iframe(srcdoc=full_html, height=1000, scrolling=False)
