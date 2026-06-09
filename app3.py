@@ -75,6 +75,6 @@ else:
 full_html = html_template.replace("__JSON_DATA__", json_data).replace("__JSON_LIST__", json_list)
 
 # --------------------------------------------------------------------
-# 【2026年最新修正】廃止された components.html を st.iframe に変更
+# 【修正】引数エラーを起こす st.iframe を廃止し、最新推奨の st.html に差し替え
 # --------------------------------------------------------------------
-st.iframe(srcdoc=full_html, height=1000, scrolling=False)
+st.html(full_html)
