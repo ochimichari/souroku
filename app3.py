@@ -10,10 +10,10 @@ st.set_page_config(page_title="奏録 / SOUROKU Web", layout="centered", initial
 all_data = {}
 session_list = []
 
-# list.txtの読み込み
+# list.txtの読み込み（Pythonの正しいメソッド .strip() に修正）
 if os.path.exists("list.txt"):
     with open("list.txt", "r", encoding="utf-8") as f:
-        session_list = [line.trim() for line in f if line.trim()]
+        session_list = [line.strip() for line in f if line.strip()]
 
 # 各セッションのテキストデータを先読み
 for folder in session_list:
