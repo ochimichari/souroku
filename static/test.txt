@@ -1,0 +1,2 @@
+JavaScript の fetch 通信に成功しました！
+Streamlit Cloud 上で静的ファイル配信機能が正常にルートされています。
