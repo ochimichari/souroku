@@ -1,0 +1,4 @@
+こんにちは！
+Streamlit Cloudのサーバー上から、
+Pythonを経由してJavaScriptへ正常にデータが渡されました。
+成功です！
