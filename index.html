@@ -141,8 +141,8 @@
             if (!trimmed || !trimmed.includes(' ')) return;
             
             const parts = trimmed.split(' ');
-            const tStr = parts[0];
-            const status = parts[1];
+            const tStr = parts[0]; // 修正: 配列の0番目を指定
+            const status = parts[1]; // 修正: 配列の1番目を指定
             try {
                 const [m, s] = tStr.replace('[', '').replace(']', '').split(':').map(Number);
                 colorData[m * 60 + s] = status.trim();
@@ -223,54 +223,55 @@
         audio.src = staticRoot + folderName + '/' + fileName + '.m4a';
         audio.load();
 
-        function fetchColorFile(rootPath) {
-            return fetch(rootPath + folderName + '/' + fileName + '_color.txt?nocache=' + new Date().getTime())
-                .then(res => { 
-                    if (!res.ok) throw new Error(); 
-                    return res.text(); 
-                })
-                .then(colorRaw => {
-                    staticRoot = rootPath; 
-                    parseColor(colorRaw);
-                    
-                    const repo = (localStorage.getItem('git_repo') || "").trim();
-                    const token = (localStorage.getItem('git_token') || "").trim();
-                    const path = 'data/' + folderName + '/' + fileName + '.txt';
-                    
-                    if (repo && token) {
-                        const apiDomain = ["https:", "", "://github.com", "repos", ""].join("/");
-                        
-                        fetch(apiDomain + repo + "/contents/" + path, {
-                            headers: { 
-                                "Authorization": "Bearer " + token,
-                                "Accept": "application/vnd.github+json"
-                            }
-                        })
-                        .then(res => { if (!res.ok) throw new Error(); return res.json(); })
-                        .then(json => {
-                            currentFileSha = json.sha;
-                            const binaryString = atob(json.content.replace(/\s/g, ''));
-                            const bytes = new Uint8Array(binaryString.length);
-                            for (let i = 0; i < binaryString.length; i++) {
-                                bytes[i] = binaryString.charCodeAt(i);
-                            }
-                            const decodedText = new TextDecoder('utf-8').decode(bytes);
-                            parseText(decodedText);
-                            resizeCanvas();
-                        })
-                        .catch(() => { fallbackFetch(folderName, fileName); });
-                    } else {
-                        fallbackFetch(folderName, fileName);
-                    }
-                });
-        }
-
-        fetchColorFile("static/")
+        fetchColorFile("app/static/", folderName, fileName)
             .catch(() => {
-                fetchColorFile("app/static/")
+                fetchColorFile("static/", folderName, fileName)
                     .catch(() => { logLoadError(); });
             });
     }
+
+    function fetchColorFile(rootPath, folderName, fileName) {
+        return fetch(rootPath + folderName + '/' + fileName + '_color.txt?nocache=' + new Date().getTime())
+            .then(res => { 
+                if (!res.ok) throw new Error(); 
+                return res.text(); 
+            })
+            .then(colorRaw => {
+                staticRoot = rootPath; 
+                parseColor(colorRaw);
+                
+                const repo = (localStorage.getItem('git_repo') || "").trim();
+                const token = (localStorage.getItem('git_token') || "").trim();
+                const path = 'data/' + folderName + '/' + fileName + '.txt';
+                
+                if (repo && token) {
+                    const apiDomain = ["https:", "", "://github.com", "repos", ""].join("/");
+                    
+                    fetch(apiDomain + repo + "/contents/" + path, {
+                        headers: { 
+                            "Authorization": "Bearer " + token,
+                            "Accept": "application/vnd.github+json"
+                        }
+                    })
+                    .then(res => { if (!res.ok) throw new Error(); return res.json(); })
+                    .then(json => {
+                        currentFileSha = json.sha;
+                        const binaryString = atob(json.content.replace(/\s/g, ''));
+                        const bytes = new Uint8Array(binaryString.length);
+                        for (let i = 0; i < binaryString.length; i++) {
+                            bytes[i] = binaryString.charCodeAt(i);
+                        }
+                        const decodedText = new TextDecoder('utf-8').decode(bytes);
+                        parseText(decodedText);
+                        resizeCanvas();
+                    })
+                    .catch(() => { fallbackFetch(folderName, fileName); });
+                } else {
+                    fallbackFetch(folderName, fileName);
+                }
+            });
+    }
+
 
     function parseText(raw) {
         editor.innerHTML = '';
@@ -291,7 +292,7 @@
             if (trimmed.startsWith('[') && trimmed.includes(']')) {
                 try {
                     const parts = trimmed.split(']');
-                    const tStr = parts.replace('[', '');
+                    const tStr = parts[0].replace('[', ''); // 修正: 配列の0番目を指定
                     const [m, s] = tStr.split(':').map(Number);
                     seconds = m * 60 + s;
                 } catch(e) {}
@@ -308,7 +309,7 @@
             idx++;
         });
     }
-
+    
     function toggleEditMode() {
         const repo = (localStorage.getItem('git_repo') || "").trim();
         const token = (localStorage.getItem('git_token') || "").trim();
