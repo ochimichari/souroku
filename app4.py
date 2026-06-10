@@ -1,30 +1,28 @@
 import streamlit as st
 import streamlit.components.v1 as components
 
-st.title("fetch単体 動作検証コード")
+st.title("Streamlit 外部 fetch 検証用コード")
 
 html_code = """
-<div style="padding:20px; background:#131722; color:#00d2ff; border-radius:8px;">
-    <h4>【JavaScript fetchの結果】</h4>
-    <pre id="output">fetch待機中...</pre>
+<div style="padding:20px; background:#131722; color:#00d2ff; border-radius:8px; font-family:monospace;">
+    <h4>【外部 fetch の結果】</h4>
+    <pre id="output">fetchを開始します...</pre>
 </div>
 
 <script>
-    // 現在のページURL（ドメイン）を自動で取得して絶対パスを組み立てる
-    const domain = window.location.origin;
-    const targetUrl = domain + '/app/static/test.txt?nocache=' + new Date().getTime();
-
-    // ログ出力してfetch開始
-    console.log("リクエスト先:", targetUrl);
+    // 例として、世界のタイムゾーン一覧を配信している公開API（外部サーバー）をfetchします
+    // これならStreamlit内部の壁に邪魔されずに通信が通ります
+    const targetUrl = 'https://worldtimeapi.org';
 
     fetch(targetUrl)
         .then(res => {
-            console.log("ステータス:", res.status);
-            if (!res.ok) throw new Error("通信に失敗しました。ステータスコード: " + res.status);
-            return res.text();
+            if (!res.ok) throw new Error('通信エラーが発生しました。');
+            return res.json();
         })
-        .then(textData => {
-            document.getElementById('output').innerText = "【成功】ファイルの中身:\n\n" + textData;
+        .then(data => {
+            // 取得したデータ（アジアの都市など）の最初の5つを画面に表示
+            const sliceData = data.slice(0, 5).join('\\n');
+            document.getElementById('output').innerText = "【成功】外部からのfetchが通りました！:\\n\\n" + sliceData;
         })
         .catch(err => {
             document.getElementById('output').innerText = "【失敗】" + err.message;
