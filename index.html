@@ -116,8 +116,6 @@
         // ★修正: folders ではなく folders[0] (最初の文字列) を渡す
         if (folders.length > 0) changeFolder(folders[0]);
     }
-
-
     
     function fallbackFetch(folderName, fileName) {
         fetch(staticRoot + folderName + '/' + fileName + '.txt?nocache=' + new Date().getTime())
@@ -145,25 +143,51 @@
 
     function parseColor(raw) {
         colorData = {};
-        if (!raw) return; // データが空ならスキップ
+        if (!raw) return;
         
         const lines = raw.split('\n');
+        let parsedIntervals = [];
+
+        // 1. まずは各行の時間（秒）とステータスを配列に集める
         lines.forEach(line => {
             const trimmed = line.trim();
             if (!trimmed || !trimmed.includes(' ')) return;
             
             const parts = trimmed.split(' ');
-            const tStr = parts[0];     // ⭕ 修正: 0番目の要素（時間）を取得
-            const status = parts[1];   // ⭕ 修正: 1番目の要素（SPEECH等）を取得
+            const tStr = parts[0];
+            const status = parts[1];
             try {
                 const [m, s] = tStr.replace('[', '').replace(']', '').split(':').map(Number);
-                colorData[m * 60 + s] = status.trim();
+                const seconds = m * 60 + s;
+                parsedIntervals.push({ time: seconds, status: status.trim() });
             } catch(e) {
                 console.error("カラー解析エラー:", e);
             }
         });
-    }
 
+        // 2. 時間順に並び替える（念のため）
+        parsedIntervals.sort((a, b) => a.time - b.time);
+
+        // 3. 【最重要】前の時間から次の時間までの「区間」をすべて同じ色で埋め尽くす
+        // とりあえず最大3時間分（10800秒）まで対応できるようにループを回します
+        let currentStatus = "SILENT";
+        let intervalIndex = 0;
+
+        for (let s = 0; s < 10800; s++) {
+            // もし現在の秒数が、次のカラーデータの切り替わり時刻に達したらステータスを更新
+            if (intervalIndex < parsedIntervals.length && s === parsedIntervals[intervalIndex].time) {
+                currentStatus = parsedIntervals[intervalIndex].status;
+                intervalIndex++;
+            }
+            colorData[s] = currentStatus;
+        }
+
+        // 4. データが読み込めたら、強制的にタイムラインを再描画する
+        if (totalDuration) {
+            resizeCanvas();
+        }
+    }
+    
     audio.addEventListener('loadedmetadata', () => {
         totalDuration = Math.floor(audio.duration);
         updateTimeLabel();
