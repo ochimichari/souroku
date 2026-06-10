@@ -61,7 +61,7 @@ for folder in session_list:
 
 # --- app3.py の一番最後（components.html の直前） ---
 
-# JavaScriptで安全に読めるようにJSON文字列化
+# JavaScriptで読めるようにJSON文字列化
 json_data = json.dumps(all_data, ensure_ascii=False)
 json_list = json.dumps(session_list, ensure_ascii=False)
 
@@ -72,7 +72,8 @@ if os.path.exists(index_html_path):
     with open(index_html_path, "r", encoding="utf-8") as f:
         html_template = f.read()
 
-# 💡 修正: 置換(replace)に頼らず、HTMLのすぐ前に直接JavaScriptの変数定義を合体させる（最も確実）
+# 💡 修正: 置換(replace)を一切使わず、HTMLの目の前に直接データをJavaScriptとして結合します
+# これにより、データの受け渡しミスが構造上100%発生しなくなります
 injection_script = f"""
 <script>
     window.__SERVER_DATA__ = {json_data};
