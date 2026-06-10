@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>奏録 / SOUROKU Web版</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: #0c0e12;
+            color: #f0f2f5;
+            display: flex;
+            justify-content: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+        .container {
+            width: 100%;
+            max-width: 480px;
+            height: 100vh;
+            background: #0c0e12;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .fixed-header-panel {
+            display: flex;
+            flex-direction: column;
+            flex-shrink: 0;
+            background: #0c0e12;
+            z-index: 10;
+        }
+        h3 {
+            margin: 5px 0 15px 0;
+            color: #00d2ff;
+            text-align: center;
+            font-size: 18px;
+            font-weight: bold;
+            letter-spacing: 0.5px;
+            border-bottom: 1px solid #1a1e26;
+            padding-bottom: 10px;
+        }
+        .selector-panel {
+            background: #131722;
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid #1e2433;
+            margin-bottom: 12px;
+        }
+        .panel-title {
+            font-size: 14px;
+            font-weight: bold;
+            color: #00d2ff;
+            margin-bottom: 8px;
+            padding-left: 4px;
+            border-left: 3px solid #00d2ff;
+        }
+        select {
+            width: 100%;
+            padding: 12px;
+            font-size: 14px;
+            border-radius: 6px;
+            border: 1px solid #2a3247;
+            background: #1c2230;
+            color: #fff;
+            font-weight: bold;
+            outline: none;
+        }
+        .player-panel {
+            background: #131722;
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid #00d2ff;
+            box-shadow: 0 0 10px rgba(0,210,255,0.2);
+            margin-bottom: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        audio {
+            width: 100%;
+            height: 38px;
+            filter: invert(90%) hue-rotate(180deg);
+        }
+        .time-display {
+            font-family: monospace;
+            font-size: 13px;
+            font-weight: bold;
+            text-align: right;
+            padding-right: 4px;
+            color: #00d2ff;
+        }
+        .timeline-container {
+            width: 100%;
+            margin-bottom: 15px;
+            height: 35px;
+        }
+        canvas {
+            width: 100%;
+            height: 100%;
+            background: #131722;
+            border-radius: 6px;
+            cursor: pointer;
+            display: block;
+            border: 1px solid #1e2433;
+        }
+        .log-header-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        .log-header-title {
+            font-size: 14px;
+            font-weight: bold;
+            color: #00d2ff;
+            padding-left: 4px;
+            border-left: 3px solid #00d2ff;
+        }
+        .btn-group {
+            display: flex;
+            gap: 6px;
+        }
+        .btn {
+            padding: 4px 10px;
+            font-size: 11px;
+            font-weight: bold;
+            border-radius: 4px;
+            cursor: pointer;
+            border: none;
+            outline: none;
+            transition: background 0.2s;
+        }
+        .btn-edit {
+            background: #00d2ff;
+            color: #0c0e12;
+        }
+        .btn-edit.editing {
+            background: #4caf50;
+            color: #fff;
+        }
+        .btn-setting {
+            background: #1e2433;
+            color: #8892b0;
+            border: 1px solid #2a3247;
+        }
+        .editor-container {
+            border: 1px solid #1e2433;
+            border-radius: 8px;
+            flex: 1;
+            overflow-y: auto;
+            background: #131722;
+            -webkit-overflow-scrolling: touch;
+            padding: 4px;
+        }
+        .line {
+            padding: 14px 12px;
+            border-bottom: 1px solid #1c2230;
+            font-size: 13.5px;
+            line-height: 1.6;
+            cursor: pointer;
+            color: #cdd4e0;
+            -webkit-tap-highlight-color: transparent;
+            transition: background 0.1s;
+            display: flex;
+            align-items: center;
+        }
+        .line:hover {
+            background: #1c2230;
+        }
+        .edit-input {
+            width: 100%;
+            padding: 6px 10px;
+            font-size: 13.5px;
+            background: #1c2230;
+            border: 1px solid #00d2ff;
+            color: #fff;
+            border-radius: 4px;
+            outline: none;
+            font-family: inherit;
+        }
+        .highlight {
+            background: #1c2c42 !important;
+            font-weight: bold;
+            color: #fff;
+            border-left: 5px solid #00d2ff;
+            padding-left: 7px;
+        }
+    </style>
+</head>
+<body>
+
+<!-- ================================================================= -->
+<!-- 【重要】Python(app3.py)からの文字列置換を受け取る隠しコンテナ     -->
+<!-- scriptタグ破壊エラーを防ぐため、HTMLの非表示DOMとして一度展開します -->
+<!-- ================================================================= -->
+<div id="raw-json-list" style="display:none;">__JSON_LIST__</div>
+<div id="raw-json-data" style="display:none;">__JSON_DATA__</div>
+
+<div class="container">
+    <div class="fixed-header-panel">
+        <h3>奏録 / SOUROKU</h3>
+        <div class="selector-panel">
+            <div class="panel-title">Select session</div>
+            <!-- ロード完了時にJS側から初期トリガーを走らせるため、onchangeを維持 -->
+            <select id="folder-selector" onchange="changeFolder(this.value)"></select>
+        </div>
+        <div class="player-panel">
+            <audio id="audio" controls></audio>
+            <div class="time-display" id="time-display">00:00 / 00:00</div>
+        </div>
+        <div class="timeline-container">
+            <canvas id="timeline-canvas"></canvas>
+        </div>
+        <div class="log-header-container">
+            <div class="log-header-title">Session Logs</div>
+            <div class="btn-group">
+                <button class="btn btn-setting" onclick="setupGitConfig()">設定</button>
+                <button id="btn-edit" class="btn btn-edit" onclick="toggleEditMode()">編集</button>
+            </div>
+        </div>
+    </div>
+    <div class="editor-container" id="editor">
+        <div style="color: #64748b; text-align: center; padding-top: 60px; font-size:13px;">データを読み込み中...</div>
+    </div>
+</div>
+
+<script>
+    // =================================================================
+    // グローバル変数の定義と初期データ展開 (ハイドレーション)
+    // =================================================================
+    let sessionList = [];
+    let serverData = {}; // 中盤コードで使用されている変数名「serverData」に統一
+    let baseUrl = "";
+    let staticRoot = ""; // 動的に絶対URLとして組み立てる
+
+    // 既存のグローバル状態を宣言
+    let colorData = {};
+    let textTimestamps = [];
+    let totalDuration = 0;
+    let currentLoadedFolder = "";
+    let currentFileSha = "";
+    let isEditing = false;
+
+    // 主要DOM要素のキャッシュ
+    const audio = document.getElementById('audio');
+    const editor = document.getElementById('editor');
+    const btnEdit = document.getElementById('btn-edit');
+    const canvas = document.getElementById('timeline-canvas');
+    const ctx = canvas ? canvas.getContext('2d') : null;
+
+    // ① 親ウィンドウ(Streamlit)のURLから静的ファイルのベースURLを自動解決
+    try {
+        baseUrl = window.parent.location.href ? new URL(window.parent.location.href).origin : window.location.origin;
+    } catch (e) {
+        baseUrl = window.location.origin;
+    }
+    // Streamlit Cloudの静的ファイルルートURL（絶対パス）を確定
+    staticRoot = baseUrl + "/app/static/";
+
+    // ② 隠しDOMコンテナ経由でPythonからのJSONデータを安全にパースして注入
+    try {
+        const listEl = document.getElementById('raw-json-list');
+        const dataEl = document.getElementById('raw-json-data');
+        if (listEl && dataEl) {
+            sessionList = JSON.parse(listEl.textContent);
+            serverData = JSON.parse(dataEl.textContent);
+            console.log("SOUROKU データの初期読み込みに成功しました:", { sessionList, serverData });
+        }
+    } catch (error) {
+        console.error("JSONデータのパースに失敗しました。特殊文字や改行のエスケープを確認してください:", error);
+    }
+
+    // ③ 画面ロード時のドロップダウン生成と初期セッション起動
+    document.addEventListener('DOMContentLoaded', () => {
+        const selector = document.getElementById('folder-selector');
+        if (!selector) return;
+
+        selector.innerHTML = '';
+        if (sessionList.length === 0) {
+            selector.innerHTML = '<option>セッションがありません</option>';
+            return;
+        }
+
+        sessionList.forEach(folder => {
+            const opt = document.createElement('option');
+            opt.value = folder;
+            opt.textContent = folder;
+            selector.appendChild(opt);
+        });
+
+        // 最初のセッションを自動ロード
+        const firstFolder = sessionList[0];
+        selector.value = firstFolder;
+        changeFolder(firstFolder);
+    });
+<script>
+    // =================================================================
+    // 1. グローバル変数の定義と初期データ展開 (ハイドレーション)
+    // =================================================================
+    let sessionList = [];
+    let serverData = {}; // ★ 既存の変数名「serverData」に統一します
+    let baseUrl = "";
+    let staticRoot = ""; // 動的に絶対URLとして組み立てます
+
+    // 既存のグローバル変数を維持
+    let colorData = {};
+    let textTimestamps = [];
+    let totalDuration = 0;
+    let currentLoadedFolder = "";
+    let currentFileSha = "";
+    let isEditing = false; // 必要に応じて初期化
+
+    // DOM要素のキャッシュ
+    const audio = document.getElementById('audio');
+    const editor = document.getElementById('editor');
+    const btnEdit = document.getElementById('btn-edit');
+
+    // ① 親ウィンドウ(Streamlit)のURLから静的ファイルのベースURLを自動解決
+    try {
+        baseUrl = window.parent.location.href ? new URL(window.parent.location.href).origin : window.location.origin;
+    } catch (e) {
+        baseUrl = window.location.origin;
+    }
+    // Streamlit Cloudの静的ファイルルートURL（絶対パス）を確定
+    staticRoot = baseUrl + "/app/static/";
+
+    // ② 隠しDOMコンテナ経由でPythonからのJSONデータを安全にパースして注入
+    try {
+        const listEl = document.getElementById('raw-json-list');
+        const dataEl = document.getElementById('raw-json-data');
+        if (listEl && dataEl) {
+            sessionList = JSON.parse(listEl.textContent);
+            serverData = JSON.parse(dataEl.textContent); // ★ serverDataへ格納！
+            console.log("SOUROKU データの同期に成功:", { sessionList, serverData });
+        }
+    } catch (error) {
+        console.error("JSONデータのパースに失敗しました:", error);
+    }
+
+    // ③ 画面ロード時のドロップダウン生成と初期セッション起動
+    document.addEventListener('DOMContentLoaded', () => {
+        const selector = document.getElementById('folder-selector');
+        if (!selector) return;
+
+        selector.innerHTML = '';
+        if (sessionList.length === 0) {
+            selector.innerHTML = '<option>セッションがありません</option>';
+            return;
+        }
+
+        sessionList.forEach(folder => {
+            const opt = document.createElement('option');
+            opt.value = folder;
+            opt.textContent = folder;
+            selector.appendChild(opt);
+        });
+
+        // 最初のセッションを自動ロード
+        const firstFolder = sessionList[0];
+        selector.value = firstFolder;
+        changeFolder(firstFolder);
+    });
+
+    // =================================================================
+    // 2. ★重要：選ばれた音声1本だけをその場でストリーミングする関数（修正版）
+    // =================================================================
+    function changeFolder(folderName) {
+        audio.pause();
+        editor.innerHTML = `<div style="color: #64748b; text-align: center; padding-top: 60px;">読み込み中...</div>`;
+
+        if (isEditing) {
+            isEditing = false;
+            if (btnEdit) {
+                btnEdit.innerText = "編集";
+                btnEdit.classList.remove('editing');
+            }
+        }
+
+        colorData = {};
+        textTimestamps = [];
+        totalDuration = 0;
+        currentLoadedFolder = folderName;
+        currentFileSha = "";
+
+        let fileName = folderName.includes('_') ? folderName.split('_').pop() : folderName;
+
+        // 【修正】絶対URLを使って音声をセット（st.htmlの仮想ルート迷子を回避）
+        // パス: https://streamlit.app[folderName]/[fileName].m4a
+        audio.src = staticRoot + folderName + '/' + fileName + '.m4a';
+        console.log("音声ストリーミングURL:", audio.src);
+        audio.load();
+
+        // 配信パスが環境によってズレた場合の安全装置（絶対パス仕様に最適化）
+        const handleAudioError = () => {
+            // もし /app/static/ で404エラー等になった場合、フォールバックとして /static/ ルートを試す
+            if (audio.src.includes('/app/static/')) {
+                staticRoot = baseUrl + "/static/";
+                audio.src = staticRoot + folderName + '/' + fileName + '.m4a';
+                audio.load();
+            }
+            audio.removeEventListener('error', handleAudioError);
+        };
+        audio.addEventListener('error', handleAudioError);
+
+        // Pythonから直渡しされたテキストデータを展開
+        const targetData = serverData[folderName];
+        if (targetData) {
+            // 後半に記述されているパース関数をコール
+            if (typeof parseColor === 'function') parseColor(targetData.color);
+
+            // GitHubから最新のテキストを取得（※Streamlit CloudのCORS制限で基本はブロックされcatchへ移行します）
+            const repo = (localStorage.getItem('git_repo') || "").trim();
+            const token = (localStorage.getItem('git_token') || "").trim();
+            const path = 'data/' + folderName + '/' + fileName + '.txt';
+
+            if (repo && token) {
+                const apiDomain = ["https:", "", "://github.com", "repos", ""].join("/");
+                fetch(apiDomain + repo + "/contents/" + path, {
+                    headers: { "Authorization": "Bearer " + token, "Accept": "application/vnd.github+json" }
+                })
+                .then(res => { if (!res.ok) throw new Error(); return res.json(); })
+                .then(json => {
+                    currentFileSha = json.sha;
+                    const binaryString = atob(json.content.replace(/\s/g, ''));
+                    const bytes = new Uint8Array(binaryString.length);
+                    for (let i = 0; i < binaryString.length; i++) { bytes[i] = binaryString.charCodeAt(i); }
+                    if (typeof parseText === 'function') parseText(new TextDecoder('utf-8').decode(bytes));
+                    if (typeof resizeCanvas === 'function') resizeCanvas();
+                })
+                .catch(() => {
+                    // fetch制限で遮断された場合、または通信エラー時は、Pythonが先読みしたデータを安全に展開
+                    if (typeof parseText === 'function') parseText(targetData.text);
+                    if (typeof resizeCanvas === 'function') resizeCanvas();
+                });
+            } else {
+                if (typeof parseText === 'function') parseText(targetData.text);
+                if (typeof resizeCanvas === 'function') resizeCanvas();
+            }
+        } else {
+            editor.innerHTML = `<div style="color:#ef5350; text-align:center; padding-top:40px; font-size:13px;">データが見つかりません。</div>`;
+        }
+    }
+    // =================================================================
+    // 1. 配色データのパース（フォーマット不一致によるフリーズ対策付き）
+    // =================================================================
+    function parseColor(raw) {
+        colorData = {};
+        if (!raw) return;
+
+        // カンマ区切りの文字列（例: SPEECH,MUSIC,SILENT...）だった場合のフォールバックを搭載
+        if (raw.includes(',') && !raw.includes('[')) {
+            const parts = raw.split(',');
+            parts.forEach((status, idx) => {
+                colorData[idx] = status.trim();
+            });
+            return;
+        }
+
+        // 元々の行ベース（[00:00] SPEECH形式）のパース処理
+        const lines = raw.split('\n');
+        lines.forEach(line => {
+            const trimmed = line.trim();
+            if (!trimmed || !trimmed.includes(' ')) return;
+            const parts = trimmed.split(' ');
+            const tStr = parts[0];
+            const status = parts[1];
+            try {
+                const [m, s] = tStr.replace('[', '').replace(']', '').split(':').map(Number);
+                colorData[m * 60 + s] = status.trim();
+            } catch(e) {
+                console.error("カラー行のパースエラー:", e);
+            }
+        });
+    }
+
+    // =================================================================
+    // 2. ログテキストのパースとDOM生成（既存ロジックを完全維持）
+    // =================================================================
+    function parseText(raw) {
+        editor.innerHTML = '';
+        textTimestamps = [];
+        if (!raw) return;
+        const lines = raw.split('\n');
+        let idx = 0;
+        lines.forEach((line) => {
+            const trimmed = line.trim();
+            if (!trimmed) return;
+            const div = document.createElement('div');
+            div.className = 'line'; div.innerText = trimmed; div.id = `line-${idx}`;
+            let seconds = -1;
+            if (trimmed.startsWith('[') && trimmed.includes(']')) {
+                try {
+                    const parts = trimmed.split(']');
+                    const tStr = parts[0].replace('[', '');
+                    const [m, s] = tStr.split(':').map(Number);
+                    seconds = m * 60 + s;
+                } catch(e) {}
+            }
+            textTimestamps.push(seconds);
+            div.addEventListener('click', () => {
+                if (!isEditing && seconds !== -1) { audio.currentTime = seconds; audio.play(); }
+            });
+            editor.appendChild(div);
+            idx++;
+        });
+    }
+
+    // =================================================================
+    // 3. 編集モード切り替え ＆ 【修正】Streamlitへのデータ保存要求送出
+    // =================================================================
+    function toggleEditMode() {
+        const lines = document.querySelectorAll('.line');
+
+        if (!isEditing) {
+            // 編集モード開始
+            isEditing = true;
+            btnEdit.innerText = "保存";
+            btnEdit.classList.add('editing');
+            lines.forEach(div => {
+                const input = document.createElement('input');
+                input.type = 'text';
+                input.className = 'edit-input';
+                input.value = div.innerText;
+                div.innerHTML = '';
+                div.appendChild(input);
+            });
+        } else {
+            // 編集完了、保存処理の実行
+            let updatedLines = [];
+            lines.forEach(div => {
+                const input = div.querySelector('.edit-input');
+                if (input) updatedLines.push(input.value.trim());
+            });
+            const fullText = updatedLines.join('\n');
+
+            btnEdit.innerText = "通信中...";
+            btnEdit.disabled = true;
+
+            let fileName = currentLoadedFolder.includes('_') ? currentLoadedFolder.split('_').pop() : currentLoadedFolder;
+
+            // ---------------------------------------------------------
+            // 【最重要修正】CORSで遮断される直接fetchを廃止し、
+            // 親ウィンドウ（Streamlit / Python側）へデータをポストするメッセージ通信へ変更
+            // ---------------------------------------------------------
+            try {
+                const savePayload = {
+                    type: "SOUROKU_SAVE_REQUEST",
+                    folder: currentLoadedFolder,
+                    fileName: fileName,
+                    text: fullText,
+                    // GitHub用トークン等が必要ならPython側に委ねるか、一緒に送る
+                    repo: (localStorage.getItem('git_repo') || "").trim(),
+                    token: (localStorage.getItem('git_token') || "").trim(),
+                    sha: currentFileSha
+                };
+
+                // Streamlitの親ウィンドウに対して、安全にデータを送信
+                window.parent.postMessage({
+                    isStreamlitMessage: true,
+                    type: "streamlit:setComponentValue", // Streamlitが受信可能な特殊イベント名
+                    value: JSON.stringify(savePayload)
+                }, "*");
+
+                // Python側での処理完了メッセージ（リロード）を待つか、
+                // 今回はシンプルにフロント側を即時更新して編集モードを抜けます
+                alert("サーバーに保存要求を送信しました。");
+
+                isEditing = false;
+                btnEdit.innerText = "編集";
+                btnEdit.disabled = false;
+                btnEdit.classList.remove('editing');
+                parseText(fullText);
+
+            } catch (err) {
+                alert("保存要求の送信に失敗しました。\nエラー: " + err.message);
+                btnEdit.innerText = "保存";
+                btnEdit.disabled = false;
+            }
+        }
+    }
+    // =================================================================
+    // 音声再生位置とログエディタのハイライトスクロール同期（ロジック完全維持）
+    // =================================================================
+    function syncEditorScroll(currentSec) {
+        let targetIdx = -1;
+        for (let i = 0; i < textTimestamps.length; i++) {
+            if (textTimestamps[i] !== -1 && textTimestamps[i] <= currentSec) {
+                targetIdx = i;
+            } else {
+                break;
+            }
+        }
+
+        // すべてのハイライトを一旦クリア
+        document.querySelectorAll('.line').forEach(el => el.classList.remove('highlight'));
+
+        // 該当する行があればハイライトしてスクロール
+        if (targetIdx !== -1) {
+            const activeLine = document.getElementById(`line-${targetIdx}`);
+            if (activeLine) {
+                activeLine.classList.add('highlight');
+                editor.scrollTo({
+                    top: activeLine.offsetTop - editor.offsetTop - 20,
+                    behavior: 'smooth'
+                });
+            }
+        }
+    }
+
+    // =================================================================
+    // 【修正】未定義関数（loadFolderList）による強制終了バグを排除
+    // 起動処理は中盤の「DOMContentLoaded」イベントに一本化しているため、ここは安全に見守る処理に変更
+    // =================================================================
+    window.onload = () => {
+        console.log("奏録 / SOUROKU Web アプリケーションが正常にロードされました。");
+    };
+</script>
+</body>
+</html>
