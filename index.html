@@ -264,11 +264,9 @@
         audio.src = window.location.origin + '/app/static/' + folderName + '/' + fileName + '.m4a';
         audio.load();
 
-        // 💡 修正：名前のズレを自動で吸収する救済処理
+        // 名前のズレを自動で吸収する救済処理
         let targetData = serverData[folderName];
-        
         if (!targetData) {
-            // 普通に探して見つからない場合、前後の空白や改行、パスの有無を無視して一致するキーを探す
             const cleanTarget = folderName.trim().replace('\r', '');
             const matchedKey = Object.keys(serverData).find(key => {
                 const cleanKey = key.trim().replace('\r', '');
@@ -276,7 +274,6 @@
             });
             
             if (matchedKey) {
-                console.log("💡 名前のズレを検知し、データを自動救済しました:", matchedKey);
                 targetData = serverData[matchedKey];
             }
         }
@@ -285,6 +282,13 @@
         if (targetData) {
             parseColor(targetData.color);
             
+            // 💡【追加】音声のロード完了(totalDurationが確定するの)を待たずに、
+            // 届いたカラーデータを使って、この瞬間に一度タイムラインを強制描写させます。
+            // これにより、音声のバグや遅延に関わらず赤や青のバーが画面に出現します。
+            setTimeout(() => {
+                resizeCanvas();
+            }, 50);
+
             const repo = (localStorage.getItem('git_repo') || "").trim();
             const token = (localStorage.getItem('git_token') || "").trim();
             const path = 'data/' + folderName + '/' + fileName + '.txt';
@@ -309,7 +313,6 @@
                 resizeCanvas();
             }
         } else {
-            // 🛠️ デバッグ用に、今どんなキーが届いているかを画面に小さく表示させる
             const availableKeys = Object.keys(serverData).join(', ') || '（データ自体が空です）';
             editor.innerHTML = `
                 <div style="color:#ef5350; text-align:center; padding-top:40px; font-size:13px;">
@@ -319,91 +322,6 @@
                 </div>`;
         }
     }
-    function changeFolder(folderName) {
-        // 安全装置: 文字列でないものが来たらセレクトボックスの値を使う
-        if (typeof folderName !== 'string' || !folderName) {
-            folderName = selector.value;
-        }
-        if (!folderName) return;
-
-        audio.pause();
-        editor.innerHTML = `<div style="color: #64748b; text-align: center; padding-top: 60px;">読み込み中...</div>`;
-        
-        if (isEditing) {
-            isEditing = false;
-            btnEdit.innerText = "編集";
-            btnEdit.classList.remove('editing');
-        }
-
-        colorData = {};
-        textTimestamps = [];
-        totalDuration = 0;
-        currentLoadedFolder = folderName;
-        currentFileSha = ""; 
-
-        let fileName = folderName.includes('_') ? folderName.split('_').pop() : folderName;
-        
-        // Streamlit Cloudの静的配信URLに対応
-        audio.src = window.location.origin + '/app/static/' + folderName + '/' + fileName + '.m4a';
-        audio.load();
-
-        // 💡 修正：名前のズレを自動で吸収する救済処理
-        let targetData = serverData[folderName];
-        
-        if (!targetData) {
-            // 普通に探して見つからない場合、前後の空白や改行、パスの有無を無視して一致するキーを探す
-            const cleanTarget = folderName.trim().replace('\r', '');
-            const matchedKey = Object.keys(serverData).find(key => {
-                const cleanKey = key.trim().replace('\r', '');
-                return cleanKey.includes(cleanTarget) || cleanTarget.includes(cleanKey);
-            });
-            
-            if (matchedKey) {
-                console.log("💡 名前のズレを検知し、データを自動救済しました:", matchedKey);
-                targetData = serverData[matchedKey];
-            }
-        }
-
-        // データの解析と画面への反映
-        if (targetData) {
-            parseColor(targetData.color);
-            
-            const repo = (localStorage.getItem('git_repo') || "").trim();
-            const token = (localStorage.getItem('git_token') || "").trim();
-            const path = 'data/' + folderName + '/' + fileName + '.txt';
-            
-            if (repo && token) {
-                const apiDomain = ["https:", "", "://github.com", "repos", ""].join("/");
-                fetch(apiDomain + repo + "/contents/" + path, {
-                    headers: { "Authorization": "Bearer " + token, "Accept": "application/vnd.github+json" }
-                })
-                .then(res => { if (!res.ok) throw new Error(); return res.json(); })
-                .then(json => {
-                    currentFileSha = json.sha;
-                    const binaryString = atob(json.content.replace(/\s/g, ''));
-                    const bytes = new Uint8Array(binaryString.length);
-                    for (let i = 0; i < binaryString.length; i++) { bytes[i] = binaryString.charCodeAt(i); }
-                    parseText(new TextDecoder('utf-8').decode(bytes));
-                    resizeCanvas();
-                })
-                .catch(() => { parseText(targetData.text); resizeCanvas(); });
-            } else {
-                parseText(targetData.text);
-                resizeCanvas();
-            }
-        } else {
-            // 🛠️ デバッグ用に、今どんなキーが届いているかを画面に小さく表示させる
-            const availableKeys = Object.keys(serverData).join(', ') || '（データ自体が空です）';
-            editor.innerHTML = `
-                <div style="color:#ef5350; text-align:center; padding-top:40px; font-size:13px;">
-                    セッションデータが見つかりません。<br>
-                    <span style="color:#64748b; font-size:11px;">探した名前: "${folderName}"<br>
-                    存在するデータ: [${availableKeys}]</span>
-                </div>`;
-        }
-    }
-
-
 
     function fetchColorFile(rootPath, folderName, fileName) {
         return fetch(rootPath + folderName + '/' + fileName + '_color.txt?nocache=' + new Date().getTime())
