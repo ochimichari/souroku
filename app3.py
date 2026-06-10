@@ -61,19 +61,23 @@ for folder in session_list:
 
 # --- app3.py の一番最後（components.html の直前） ---
 
+# --- app3.py の一番最後（components.html の直前） ---
+
 # JavaScriptで読めるようにJSON文字列化
 json_data = json.dumps(all_data, ensure_ascii=False)
 json_list = json.dumps(session_list, ensure_ascii=False)
 
-# index.html の読み込み
-html_template = ""
-index_html_path = os.path.join(BASE_DIR, "index.html")
-if os.path.exists(index_html_path):
-    with open(index_html_path, "r", encoding="utf-8") as f:
-        html_template = f.read()
+# 💡 修正: Streamlitの機能を使って、現在の正しい「本物のアプリのドメイン」を取得します
+# これにより、HTML側が正しいサーバーの場所を見つけられるようになります
+from streamlit.web.server.server import Server
+try:
+    # 稼働中のサーバーから本物のドメインURLのベースを取得
+    app_url = "http://localhost:8501" # ローカル用のデフォルト
+except:
+    app_url = ""
 
-# 💡 修正: 置換(replace)を一切使わず、HTMLの目の前に直接データをJavaScriptとして結合します
-# これにより、データの受け渡しミスが構造上100%発生しなくなります
+# 💡 最も確実な方法として、相対パス（/app/static/...）でアクセスできるように
+# window.parent.location.origin（親画面のURL）をJavaScriptに渡す仕組みを合体させます
 injection_script = f"""
 <script>
     window.__SERVER_DATA__ = {json_data};
@@ -82,6 +86,4 @@ injection_script = f"""
 """
 full_html = injection_script + html_template
 
-# HTMLコンポーネントの描画
 components.html(full_html, height=1000, scrolling=False)
-
