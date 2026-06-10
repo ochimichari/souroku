@@ -103,15 +103,17 @@
     function processFolderList(folders) {
         selector.innerHTML = '';
         
-        // すでにPython側で綺麗な配列になっているため、splitやtrimは不要になります
         folders.forEach(folder => {
             const opt = document.createElement('option');
             opt.value = folder;
             opt.innerText = folder.replace(/_/g, ' ');
             selector.appendChild(opt);
         });
+        
+        // ★修正: folders ではなく folders[0] (最初の文字列) を渡す
         if (folders.length > 0) changeFolder(folders[0]);
     }
+
 
     
     function fallbackFetch(folderName, fileName) {
@@ -204,6 +206,12 @@
     }
 
     function changeFolder(folderName) {
+        // ★追加: もし渡された値が文字列でなかったり、選択ボックスとズレていれば、
+        // 現在選択されている値を強制的に使用する安全装置
+        if (typeof folderName !== 'string' || !folderName) {
+            folderName = selector.value;
+        }
+        
         audio.pause();
         editor.innerHTML = `<div style="color: #64748b; text-align: center; padding-top: 60px;">読み込み中...</div>`;
         
@@ -212,25 +220,23 @@
             btnEdit.innerText = "編集";
             btnEdit.classList.remove('editing');
         }
-
+    
         colorData = {};
         textTimestamps = [];
         totalDuration = 0;
         currentLoadedFolder = folderName;
         currentFileSha = ""; 
-
+    
         let fileName = folderName.includes('_') ? folderName.split('_').pop() : folderName;
         
         // 音声ファイルの読み込みパスを適用
         audio.src = staticRoot + folderName + '/' + fileName + '.m4a';
         audio.load();
-
-        // ★修正：サーバー内のテキストはPythonが持っているため、ここでのfetchは完全にゼロになりました
+    
         const targetData = serverData[folderName];
         if (targetData) {
             parseColor(targetData.color);
             
-            // GitHubから最新の編集履歴を引っ張る処理（無ければPythonの先読みテキストを使用）
             const repo = (localStorage.getItem('git_repo') || "").trim();
             const token = (localStorage.getItem('git_token') || "").trim();
             const path = 'data/' + folderName + '/' + fileName + '.txt';
@@ -258,6 +264,7 @@
             editor.innerHTML = `<div style="color:#ef5350; text-align:center; padding-top:40px; font-size:13px;">セッションデータが見つかりません。</div>`;
         }
     }
+
 
     function fetchColorFile(rootPath, folderName, fileName) {
         return fetch(rootPath + folderName + '/' + fileName + '_color.txt?nocache=' + new Date().getTime())
