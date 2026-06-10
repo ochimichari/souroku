@@ -4,16 +4,33 @@ import json
 import streamlit as st
 import streamlit.components.v1 as components
 
-st.set_page_config(page_title="奏録 / SOUROKU Web", layout="centered", initial_sidebar_state="collapsed")
+# 最上層のパスを確実に取得
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+list_txt_path = os.path.join(BASE_DIR, "list.txt")
 
-# 1. サーバー内のデータを全てスキャンして辞書にまとめる
-all_data = {}
 session_list = []
 
-# list.txtの読み込み（Pythonの正しいメソッド .strip() に修正）
-if os.path.exists("list.txt"):
-    with open("list.txt", "r", encoding="utf-8") as f:
-        session_list = [line.strip() for line in f if line.strip()]
+if os.path.exists(list_txt_path):
+    # 'utf-8-sig' にすることで、BOM付きUTF-8ファイルでも正常に読み込めます
+    with open(list_txt_path, "r", encoding="utf-8-sig") as f:
+        for line in f:
+            # 1. 改行コード（\r\n や \n）を完全に除去
+            # 2. 前後の不要な空白を除去
+            clean_line = line.replace('\r', '').replace('\n', '').strip()
+            
+            # 空行でなければリストに追加
+            if clean_line:
+                session_list = clean_line
+else:
+    # 画面にファイルが見つからないエラーを表示（デバッグ用）
+    st.error(f"❌ list.txt が最上層に見つかりません。探索パス: {list_txt_path}")
+
+# デバッグ用：正しく読み込めたか画面に中身を出力してみる
+if session_list:
+    st.success(f"✅ list.txt の読み込みに成功しました！データ数: {len(session_list)}")
+    # st.write(session_list) # 中身を確認したい場合はコメントアウトを外してください
+else:
+    st.warning("⚠️ list.txt は存在しますが、中身が空、または正しく行を認識できていません。")
 
 # 各セッションのテキストデータを先読み
 for folder in session_list:
