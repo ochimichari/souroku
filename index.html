@@ -142,18 +142,22 @@
 
     function parseColor(raw) {
         colorData = {};
+        if (!raw) return; // データが空ならスキップ
+        
         const lines = raw.split('\n');
         lines.forEach(line => {
             const trimmed = line.trim();
             if (!trimmed || !trimmed.includes(' ')) return;
             
             const parts = trimmed.split(' ');
-            const tStr = parts[0]; // 修正: 配列の0番目を指定
-            const status = parts[1]; // 修正: 配列の1番目を指定
+            const tStr = parts[0];     // ⭕ 修正: 0番目の要素（時間）を取得
+            const status = parts[1];   // ⭕ 修正: 1番目の要素（SPEECH等）を取得
             try {
                 const [m, s] = tStr.replace('[', '').replace(']', '').split(':').map(Number);
                 colorData[m * 60 + s] = status.trim();
-            } catch(e) {}
+            } catch(e) {
+                console.error("カラー解析エラー:", e);
+            }
         });
     }
 
