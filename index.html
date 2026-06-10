@@ -94,13 +94,16 @@
     }
 
     function loadFolderList() {
-        const rawText = `__LIST_DATA__`;
-        processFolderList(rawText);
+        // Python側の __JSON_LIST__ から直接配列（JSON）として受け取ります
+        // クォーテーション（` や '）で囲まないのがポイントです
+        const folders = __JSON_LIST__;
+        processFolderList(folders);
     }
 
-    function processFolderList(rawText) {
+    function processFolderList(folders) {
         selector.innerHTML = '';
-        const folders = rawText.split('\n').map(f => f.trim()).filter(f => f.length > 0);
+        
+        // すでにPython側で綺麗な配列になっているため、splitやtrimは不要になります
         folders.forEach(folder => {
             const opt = document.createElement('option');
             opt.value = folder;
@@ -109,6 +112,8 @@
         });
         if (folders.length > 0) changeFolder(folders[0]);
     }
+
+    
     function fallbackFetch(folderName, fileName) {
         fetch(staticRoot + folderName + '/' + fileName + '.txt?nocache=' + new Date().getTime())
             .then(res => { 
