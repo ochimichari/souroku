@@ -59,21 +59,28 @@ for folder in session_list:
         if debug_mode:
             st.error(f"🔴 テキスト無し: `{t_path}` が見つかりません")
 
-# JavaScript用にJSON文字列化
+# --- app3.py の一番最後（components.html の直前） ---
+
+# JavaScriptで安全に読めるようにJSON文字列化
 json_data = json.dumps(all_data, ensure_ascii=False)
 json_list = json.dumps(session_list, ensure_ascii=False)
 
-# --- 3. HTMLテンプレートの読み込みと埋め込み ---
+# index.html の読み込み
 html_template = ""
 index_html_path = os.path.join(BASE_DIR, "index.html")
 if os.path.exists(index_html_path):
     with open(index_html_path, "r", encoding="utf-8") as f:
         html_template = f.read()
-    if debug_mode:
-        st.success(f"📄 **index.html 読み込み成功**")
-else:
-    st.error(f"❌ **index.html が見つかりません。** 探索パス: {index_html_path}")
 
-# データの置換と表示
-full_html = html_template.replace("__JSON_DATA__", json_data).replace("__JSON_LIST__", json_list)
+# 💡 修正: 置換(replace)に頼らず、HTMLのすぐ前に直接JavaScriptの変数定義を合体させる（最も確実）
+injection_script = f"""
+<script>
+    window.__SERVER_DATA__ = {json_data};
+    window.__JSON_LIST__ = {json_list};
+</script>
+"""
+full_html = injection_script + html_template
+
+# HTMLコンポーネントの描画
 components.html(full_html, height=1000, scrolling=False)
+
