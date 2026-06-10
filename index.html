@@ -261,7 +261,7 @@
         let fileName = folderName.includes('_') ? folderName.split('_').pop() : folderName;
         
         // Streamlit Cloudの静的配信URLに対応
-        audio.src = window.location.origin + '/' + folderName + '/' + fileName + '.m4a';
+        audio.src = window.location.origin + 'static/' + folderName + '/' + fileName + '.m4a';
         audio.load();
 
         // 名前のズレを自動で吸収する救済処理
