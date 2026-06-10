@@ -260,8 +260,17 @@
 
         let fileName = folderName.includes('_') ? folderName.split('_').pop() : folderName;
         
-        // Streamlit Cloudの静的配信URLに対応
-        audio.src = window.location.origin + 'static/' + folderName + '/' + fileName + '.m4a';
+        // 💡 修正：自分のURL（window.location）ではなく、
+        // 親画面（Streamlit本体）のURL（window.parent.location）を基準にしてURLを組み立てます
+        try {
+            // 親画面のドメイン（本物のアプリのURL）を正確に取得
+            const realOrigin = window.parent.location.origin;
+            audio.src = realOrigin + '/app/static/' + folderName + '/' + fileName + '.m4a';
+        } catch (e) {
+            // セキュリティブロックで親画面が見えない場合のセーフティ（相対パス）
+            audio.src = '/app/static/' + folderName + '/' + fileName + '.m4a';
+        }
+        
         audio.load();
 
         // 名前のズレを自動で吸収する救済処理
