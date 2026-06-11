@@ -1,8 +1,7 @@
 import os
 import streamlit as st
-import streamlit.components.v1 as components
 
-st.title("🎵 カスタムHTMLプレイヤー (完全統合版)")
+st.title("🎵 カスタムHTMLプレイヤー (確定解決版)")
 
 STATIC_DIR = "static"
 
@@ -32,51 +31,21 @@ if available_folders:
     # サーバ上の実際の音声ファイルパス
     physical_path = os.path.join(STATIC_DIR, selected_folder, f"{selected_file_name}.m4a")
 
-    # Streamlitのシステムから、クラウドで100%再生できる公式URLを逆引き
-    try:
-        from streamlit.runtime.scriptrunner import get_script_run_ctx
-        ctx = get_script_run_ctx()
-        session_id = ctx.session_id if ctx else None
-        
-        audio_url = st.runtime.get_instance().media_file_mgr.add(
-            physical_path, "audio/mp4", session_id
-        )
-    except Exception:
-        audio_url = f"/static/{selected_folder}/{selected_file_name}.m4a"
-
-    st.caption(f"選択中: {selected_folder}/{selected_file_name}.m4a")
-
-    # 🔴【変更点】元のplayer.htmlに書いていたHTMLとCSSを、ここに直接変数として記述します。
-    # これにより「ファイルが見つからないバグ」を完全に消滅させます。
-    html_code = f"""
-    <!DOCTYPE html>
-    <html lang="ja">
-    <head>
-        <meta charset="UTF-8">
-        <style>
-            body {{ margin: 0; padding: 0; background: transparent; font-family: sans-serif; }}
-            .player-panel {{ background: #f0f2f6; padding: 15px; border-radius: 10px; box-sizing: border-box; }}
-            .time-display {{ font-family: monospace; margin-top: 5px; color: #31333f; font-size: 14px; }}
-            audio {{ width: 100%; margin-top: 5px; }}
-        </style>
-    </head>
-    <body>
-        <div class="player-panel">
-            <div style="font-weight: bold; color: #31333f; font-size: 14px;">再生中: {selected_file_name}.m4a</div>
-            <audio id="audio" controls src="{audio_url}"></audio>
-            <div class="time-display" id="time-display">00:00 / 00:00</div>
+    # 🟢 解決策：外枠のデザイン（HTML/CSS）だけを st.markdown で描画します
+    st.markdown(
+        f"""
+        <div style="background-color: #f0f2f6; padding: 15px; border-radius: 10px; box-sizing: border-box; font-family: sans-serif;">
+            <div style="font-weight: bold; color: #31333f; font-size: 14px; margin-bottom: 5px;">
+                再生中: {selected_file_name}.m4a
+            </div>
         </div>
-    </body>
-    </html>
-    """
-    
-    components.html(
-        html_code,
-        height=160,
-        key="my_fixed_audio_player"  # 固定の文字列にするか、keyの行自体を消してもOKです
+        """,
+        unsafe_allow_html=True
     )
+
+    # 🟢 そして、一番最初に100%動いたStreamlit標準の安全なオーディオプレイヤーを直下に配置します
+    # これなら、最新のStreamlit(Python 3.14)でも絶対にTypeErrorを吐きません
+    st.audio(physical_path, format="audio/mp4")
 
 else:
     st.warning("`static` フォルダ内に有効な音声フォルダが見つかりません。")
-
-    
