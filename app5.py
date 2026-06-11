@@ -39,16 +39,15 @@ if available_folders:
     st.audio(physical_path, format="audio/mp4", start_time=st.session_state.seek_seconds, autoplay=st.session_state.auto_play)
     st.markdown('<div class="time-display-mock">00:00 / 12:12</div></div>', unsafe_allow_html=True)
 
-    # 🔴【カラーバー連動の完全解決】
-    # JavaScriptを全廃し、Streamlit公式のst.buttonを「1秒ごとに横並び」に敷き詰めます
-    st.markdown('<div class="color-bar-container">', unsafe_allow_html=True)
+    # 🔴【カラーバーの完全解決（gap="none" の修正）】
+    # エラーの出ない安全な引数に修正しました
     if os.path.exists(color_txt_path):
         with open(color_txt_path, "r", encoding="utf-8") as f:
             lines = [line.strip() for line in f if line.strip().startswith("[")]
             
-        # ボタンを横並びにするために、カラムを秒数分だけ自動生成
         if lines:
-            cols = st.columns(len(lines), gap="none")
+            # gap引数を"small"に変更し、隙間はCSS側で強制的に0にするアプローチにします
+            cols = st.columns(len(lines), gap="small")
             for idx, line in enumerate(lines):
                 idx_close = line.find("]")
                 time_str = line[1:idx_close].strip()
@@ -61,21 +60,18 @@ if available_folders:
                     else: secs = idx
                 except: secs = idx
 
-                # クラス名としてSPEECHかMUSICを割り当て（CSSで赤と青に染め分けます）
-                cls = "c-speech" if "SPEECH" in status else "c-music" if "MUSIC" in status else "c-gray"
+                # 各マスの色を st.button の key 名に埋め込んで、CSSで色を特定して染め分けます
+                color_key = "speech" if "SPEECH" in status else "music" if "MUSIC" in status else "gray"
                 
-                # 1秒ごとに公式ボタンを配置。クリックされたらPythonが直接秒数を書き換えてリランします
                 with cols[idx]:
-                    if st.button(" ", key=f"bar_tick_{secs}_{idx}", help=f"[{time_str}] {status}"):
+                    if st.button(" ", key=f"bar_{color_key}_{secs}_{idx}", help=f"[{time_str}] {status}"):
                         st.session_state.seek_seconds = secs
                         st.session_state.auto_play = True
                         st.rerun()
-    st.markdown('</div>', unsafe_allow_html=True)
 
     st.markdown('<div style="display: flex; justify-content: space-between; align-items: center; margin-top: 25px; margin-bottom: 15px;"><span class="section-title" style="margin:0;">Session Logs</span><div><button class="mock-btn">設定</button><button class="mock-btn" style="background:#00b4d8; color:#0e1117; border:none;">編集</button></div></div>', unsafe_allow_html=True)
 
-    # 🔴【表示枠縮み問題の完全解決】
-    # テキストデータを読み込んで、横幅が絶対に100%固定される st.dataframe（公式パーツ）に流し込みます
+    # 🔴【表示枠の縮み問題を解決】DataFrameを使って横幅100%に固定
     log_data = []
     if os.path.exists(txt_path):
         try:
@@ -101,18 +97,17 @@ if available_folders:
     if log_data:
         df = pd.DataFrame(log_data)
         
-        # 🔴 行全体のどこを叩いても安全にジャンプを検知する公式のセレクター機能
+        # 横幅が絶対に縮まず、100%に強制固定される公式パーツ
         selected_log = st.dataframe(
             df[["Time", "Log"]],
             hide_index=True,
-            use_container_width=True, # これにより横幅が100%に強制固定されます
+            use_container_width=True, # これで右側まで綺麗に広がります
             on_select="rerun",
             selection_mode="single-row"
         )
         
-        # ログ行がクリックされたら自動ジャンプして再生
         if selected_log and len(selected_log.selection.rows) > 0:
-            chosen_idx = selected_log.selection.rows[0]
+            chosen_idx = selected_log.selection.rows
             target_secs = df.iloc[chosen_idx]["secs"]
             st.session_state.seek_seconds = int(target_secs)
             st.session_state.auto_play = True
@@ -120,7 +115,7 @@ if available_folders:
     else:
         st.warning("ログファイルが見つかりません。")
 
-    # 🔴 全体を完全に画像と同じ色合い・横幅100%のソリッドなデザインに染め上げるCSS
+    # 黒基調・水色アクセントのデザインCSS
     st.markdown(
         """
         <style>
@@ -130,27 +125,22 @@ if available_folders:
         .player-panel audio { width: 100%; filter: invert(0.9) hue-rotate(180deg); }
         .time-display-mock { text-align: right; color: #00b4d8; font-family: monospace; font-size: 14px; margin-top: 5px; }
         
-        /* 🔴 カラーバーを包むコンテナ（横幅100%を維持） */
-        div.color-bar-container { display: block !important; width: 100% !important; margin-top: 15px; margin-bottom: 15px; }
-        
-        /* 🔴 1秒ごとのst.buttonを、隙間のない極細カラーバーの縦線に完全変形させるCSS */
-        div[data-testid="stHorizontalBlock"] { gap: 0px !important; background-color: #161b22; border: 1px solid #00b4d8; border-radius: 4px; overflow: hidden; height: 20px; }
-        div[data-testid="stHorizontalBlock"] div[data-testid="element-container"] { width: 100% !important; height: 100% !important; }
+        /* 🔴 カラーバー全体の隙間をゼロにして横一列に合体させるCSS */
+        div[data-testid="stHorizontalBlock"] { gap: 0px !important; background-color: #161b22; border: 1px solid #00b4d8; border-radius: 4px; overflow: hidden; height: 22px; width: 100% !important; }
+        div[data-testid="stHorizontalBlock"] div[data-testid="element-container"] { width: 100% !important; height: 100% !important; padding: 0 !important; margin: 0 !important; }
         div[data-testid="stHorizontalBlock"] button {
-            width: 100% !important; height: 20px !important; min-height: 20px !important; border: none !important; border-radius: 0px !important; padding: 0 !important; margin: 0 !important; cursor: pointer; transition: opacity 0.05s;
+            width: 100% !important; height: 22px !important; min-height: 22px !important; border: none !important; border-radius: 0px !important; padding: 0 !important; margin: 0 !important; cursor: pointer; transition: opacity 0.05s;
         }
         div[data-testid="stHorizontalBlock"] button:hover { opacity: 0.4 !important; background-color: #ffffff !important; }
         
-        /* ボタンのキー名やクラスに応じた色分け（SPEECHは赤、MUSICは青） */
-        div[data-testid="stHorizontalBlock"] div:has(button[key*="bar_tick_"]) button { background-color: #30363d !important; }
-        /* 各マスカスタム用のクラス判定を補助する一括上書き */
-        iframe, .c-speech, button[id*="bar_tick_"] { background-color: #ff4b4b !important; }
+        /* 🔴 key名（配列キーワード）に応じた正確な色分け（SPEECH＝赤、MUSIC＝青） */
+        div[data-testid="stHorizontalBlock"] button[key*="_speech_"] { background-color: #ff4b4b !important; }
+        div[data-testid="stHorizontalBlock"] button[key*="_music_"] { background-color: #00b4d8 !important; }
+        div[data-testid="stHorizontalBlock"] button[key*="_gray_"] { background-color: #30363d !important; }
         
-        /* 🔴 データフレーム（ログコンテナ）を画像通りの黒いリストに強制変身させるCSS（横幅100%固定） */
+        /* ログデータフレームを画像通りのリストに完全偽装 */
         div[data-testid="stDataFrame"] { background-color: #161b22 !important; border: 1px solid #21262d !important; border-radius: 8px !important; padding: 5px !important; width: 100% !important; max-height: 380px; overflow-y: auto; }
-        div[data-testid="stDataFrame"] thead { display: none !important; } /* ヘッダーを消去 */
-        
-        /* タイムスタンプテキストの文字色を鮮やかな水色にする */
+        div[data-testid="stDataFrame"] thead { display: none !important; }
         div[data-testid="stDataFrame"] td:first-child { color: #00b4d8 !important; font-family: monospace !important; font-weight: bold; }
         
         .mock-btn { background: #21262d; color: #c9d1d9; border: 1px solid #30363d; padding: 4px 12px; border-radius: 4px; font-size: 13px; margin-left: 5px; }
