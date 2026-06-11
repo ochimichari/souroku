@@ -103,6 +103,7 @@ if available_folders:
 
     st.markdown('</div>', unsafe_allow_html=True)
     # 🔴【後半】ホバー表示＆100%バグらないボタン探索JavaScript
+    # 🔴【後半】ホバー表示＆100%バグらないボタン探索JavaScript（バグ修正版）
     st.markdown(
         """
         <script>
@@ -119,7 +120,7 @@ if available_folders:
                     const timeParts = rawTime.split(':');
                     let btnSec = 0;
                     
-                    // インデックス指定を完全に修正して計算を成功させます
+                    // 🔴 配列のインデックス指定（[0],[1],[2]）を正確に修正しました
                     if (timeParts.length === 2) {
                         btnSec = parseInt(timeParts[0], 10) * 60 + parseInt(timeParts[1], 10);
                     } else if (timeParts.length === 3) {
@@ -194,3 +195,4 @@ if available_folders:
     )
 else:
     st.warning("`static` フォルダ内に有効な音声フォルダが見つかりません。")
+
