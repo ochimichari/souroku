@@ -1,1 +1,22 @@
+<!-- プレイヤーのパネル部分（既存のコード） -->
+<div class="player-panel">
+    <audio id="audio" controls></audio>
+    <div class="time-display" id="time-display">00:00 / 00:00</div>
+</div>
+
+<script>
+// 音声プレイヤーを初期化・再生する関数
+function initPlayer() {
+    const audio = document.getElementById('audio');
+    
+    // Python側から渡された「安全なURL」を直接代入（CORSエラーが発生しません）
+    if (window.audioUrlFromPython) {
+        audio.src = window.audioUrlFromPython;
+        audio.load();
+    }
+}
+
+// 念のため、HTMLが読み込まれたタイミングでも実行を試みる
+document.addEventListener('DOMContentLoaded', initPlayer);
+</script>
 
