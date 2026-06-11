@@ -2,11 +2,11 @@ import os
 import streamlit as st
 import streamlit.components.v1 as components
 
-st.title("🎵 カスタムHTMLプレイヤー")
+st.title("🎵 カスタムHTMLプレイヤー (完全統合版)")
 
 STATIC_DIR = "static"
 
-# 有効なフォルダを自動リサーチ（ここはこれまでと同じです）
+# 有効な音声フォルダを自動リサーチ
 available_folders = []
 if os.path.exists(STATIC_DIR):
     for folder in os.listdir(STATIC_DIR):
@@ -29,41 +29,53 @@ if available_folders:
     else:
         selected_file_name = selected_folder
         
-    # サーバ上の実際のファイルパス
+    # サーバ上の実際の音声ファイルパス
     physical_path = os.path.join(STATIC_DIR, selected_folder, f"{selected_file_name}.m4a")
 
-    # 🔴【重要】手書きの /static/ をやめて、Streamlitのシステムから
-    # 「このクラウド環境でブラウザが100%アクセスできる本物のURL」を逆引きして取得します。
+    # Streamlitのシステムから、クラウドで100%再生できる公式URLを逆引き
     try:
         from streamlit.runtime.scriptrunner import get_script_run_ctx
         ctx = get_script_run_ctx()
         session_id = ctx.session_id if ctx else None
         
-        # Streamlitのメディアマネージャーにファイルを登録し、公式の配信URLを発行してもらう
         audio_url = st.runtime.get_instance().media_file_mgr.add(
             physical_path, "audio/mp4", session_id
         )
     except Exception:
-        # 万が一、ローカル環境などで上記が失敗したときの保険
         audio_url = f"/static/{selected_folder}/{selected_file_name}.m4a"
 
     st.caption(f"選択中: {selected_folder}/{selected_file_name}.m4a")
 
-    # player.htmlの中身を読み込んでURLを埋め込む（ここは先ほどと同じです）
-    if os.path.exists("player.html"):
-        with open("player.html", "r", encoding="utf-8") as f:
-            html_template = f.read()
+    # 🔴【変更点】元のplayer.htmlに書いていたHTMLとCSSを、ここに直接変数として記述します。
+    # これにより「ファイルが見つからないバグ」を完全に消滅させます。
+    html_code = f"""
+    <!DOCTYPE html>
+    <html lang="ja">
+    <head>
+        <meta charset="UTF-8">
+        <style>
+            body {{ margin: 0; padding: 0; background: transparent; font-family: sans-serif; }}
+            .player-panel {{ background: #f0f2f6; padding: 15px; border-radius: 10px; box-sizing: border-box; }}
+            .time-display {{ font-family: monospace; margin-top: 5px; color: #31333f; font-size: 14px; }}
+            audio {{ width: 100%; margin-top: 5px; }}
+        </style>
+    </head>
+    <body>
+        <div class="player-panel">
+            <div style="font-weight: bold; color: #31333f; font-size: 14px;">再生中: {selected_file_name}.m4a</div>
+            <audio id="audio" controls src="{audio_url}"></audio>
+            <div class="time-display" id="time-display">00:00 / 00:00</div>
+        </div>
+    </body>
+    </html>
+    """
 
-        # HTML内の %%AUDIO_URL%% を、Streamlitが発行した公式URLに置換
-        final_html = html_template.replace("%%AUDIO_URL%%", audio_url)
+    # プレイヤーの画面描画（高さをしっかり確保し、キーを変えることで確実に曲を切り替えます）
+    components.html(
+        html_code,
+        height=160,
+        key=f"player_{selected_folder}"
+    )
 
-        # keyを指定して、無駄な再描画によるフラッシュを最小限に抑える
-        components.html(
-            final_html,
-            height=160,
-            key=f"player_{selected_folder}"  # 選択フォルダごとにキーを変えることで、確実に曲を切り替えます
-        )
-    else:
-        st.error("⚠️ `player.html` が見つかりません。")
 else:
     st.warning("`static` フォルダ内に有効な音声フォルダが見つかりません。")
