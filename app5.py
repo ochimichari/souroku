@@ -2,11 +2,11 @@ import os
 import streamlit as st
 import streamlit.components.v1 as components
 
-st.title("🎵 カスタムHTMLプレイヤー (完全解決版)")
+st.title("🎵 カスタムHTMLプレイヤー")
 
 STATIC_DIR = "static"
 
-# 有効なフォルダを検索（ここは先ほどと同じです）
+# 有効なフォルダを自動リサーチ
 available_folders = []
 if os.path.exists(STATIC_DIR):
     for folder in os.listdir(STATIC_DIR):
@@ -29,16 +29,21 @@ if available_folders:
     else:
         selected_file_name = selected_folder
         
-    # 音声ファイルへの「HTMLから見た相対パス」を計算します
-    # player.html から見ると、同じ static フォルダ内なので以下のパスで届きます
-    audio_relative_url = f"./{selected_folder}/{selected_file_name}.m4a"
+    # 音声の正しいURL（ドメイン直下の /static/... から指定）
+    audio_url = f"/static/{selected_folder}/{selected_file_name}.m4a"
 
-    # 🔴 HTMLと音声を同じ「/static/」ドメイン下で動かすことで、セキュリティを突破します
-    # URLの末尾に「?audio=音声のパス」をつけてHTMLに伝えます
-    iframe_url = f"/static/player.html?audio={audio_relative_url}"
+    st.caption(f"選択中: {selected_folder}/{selected_file_name}.m4a")
 
-    # st.components.v1.iframe を使って、静的配信されているHTMLを直接呼び出します
-    components.iframe(iframe_url, height=200)
-
+    # 🔴 潰れて見えなくなるのを防ぐため、iframe（内側の枠）に直接「見える大きさ」を書き込みます
+    # これにより、プレイヤーが最初から必ず画面に表示されます
+    components.html(
+        f"""
+        <iframe src="/static/player.html?audio={audio_url}" 
+                style="width:100%; height:150px; border:none; overflow:hidden;" 
+                scrolling="no">
+        </iframe>
+        """,
+        height=160,  # Streamlit側で確保する外側の高さ
+    )
 else:
     st.warning("`static` フォルダ内に有効な音声フォルダが見つかりません。")
