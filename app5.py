@@ -2,11 +2,11 @@ import os
 import streamlit as st
 import streamlit.components.v1 as components
 
-st.title("🎵 カスタムHTMLプレイヤー (確定版)")
+st.title("🎵 カスタムHTMLプレイヤー (完全解決版)")
 
 STATIC_DIR = "static"
 
-# 有効なフォルダを自動リサーチ
+# 有効なフォルダを検索（ここは先ほどと同じです）
 available_folders = []
 if os.path.exists(STATIC_DIR):
     for folder in os.listdir(STATIC_DIR):
@@ -29,24 +29,16 @@ if available_folders:
     else:
         selected_file_name = selected_folder
         
-    # 🔴 /app は含めず、ドメイン直下の「/static/...」という正しいURLを作ります
-    audio_url = f"/static/{selected_folder}/{selected_file_name}.m4a"
+    # 音声ファイルへの「HTMLから見た相対パス」を計算します
+    # player.html から見ると、同じ static フォルダ内なので以下のパスで届きます
+    audio_relative_url = f"./{selected_folder}/{selected_file_name}.m4a"
 
-    if os.path.exists("player.html"):
-        with open("player.html", "r", encoding="utf-8") as f:
-            html_code = f.read()
+    # 🔴 HTMLと音声を同じ「/static/」ドメイン下で動かすことで、セキュリティを突破します
+    # URLの末尾に「?audio=音声のパス」をつけてHTMLに伝えます
+    iframe_url = f"/static/player.html?audio={audio_relative_url}"
 
-        # HTMLを埋め込み、正しいURLを引き渡す
-        components.html(
-            html_code + f"""
-            <script>
-                window.audioUrlFromPython = "{audio_url}";
-                if (typeof initPlayer === "function") {{
-                    initPlayer();
-                }}
-            </script>
-            """,
-            height=200,
-        )
+    # st.components.v1.iframe を使って、静的配信されているHTMLを直接呼び出します
+    components.iframe(iframe_url, height=200)
+
 else:
     st.warning("`static` フォルダ内に有効な音声フォルダが見つかりません。")
