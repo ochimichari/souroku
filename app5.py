@@ -30,45 +30,60 @@ if available_folders:
         
     physical_path = os.path.join(STATIC_DIR, selected_folder, f"{selected_file_name}.m4a")
 
-    # 1. プレイヤーを囲む外枠を配置
+    # 🔴【デザインの工夫】全体を囲む独自のパネル（枠）を配置します
     st.markdown(
         f"""
-        <div class="custom-player-box">
-            <div class="player-title">📄 再生中: {selected_file_name}.m4a</div>
-        </div>
+        <div class="my-audio-container">
+            <div class="my-audio-header">
+                <span class="music-icon">🎵</span>
+                <span class="music-title">再生中: {selected_file_name}.m4a</span>
+            </div>
+            <div class="player-wrapper">
         """,
         unsafe_allow_html=True
     )
 
-    # 2. クラウドで稼働実績のある確実なプレイヤーを配置
+    # 🔴 タイムライン選択が100%確実に動く公式プレイヤー（この位置に埋め込まれます）
     st.audio(physical_path, format="audio/mp4")
 
-    # 3. 🔴 画面全体の「見た目（CSS）」を直接上書きする
-    # ここにCSSを記述することで、HTMLファイルを作らなくてもデザインを変更できます
+    # 閉じタグ
+    st.markdown('</div></div>', unsafe_allow_html=True)
+
+    # 🔴 CSSで標準プレイヤーを包み込み、オリジナルの見た目に変形させます
     st.markdown(
         """
         <style>
-        /* プレイヤーを囲む背景パネルのデザイン */
-        .custom-player-box {
-            background-color: #f0f2f6; 
-            padding: 15px; 
-            border-radius: 10px; 
+        /* 全体を包む独自パネル（グレーの背景、大きな角丸、シャドウ） */
+        .my-audio-container {
+            background: linear-gradient(135deg, #f0f2f6 0%, #e4e7eb 100%);
+            padding: 20px;
+            border-radius: 16px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
             font-family: sans-serif;
-            margin-bottom: -10px; /* 下のプレイヤーと密着させる */
-        }
-        .player-title {
-            font-weight: bold; 
-            color: #31333f; 
-            font-size: 14px;
+            margin-top: 10px;
         }
         
-        /* Streamlit標準のaudioプレイヤー自体の見た目をCSSでカスタム（ブラウザ依存あり） */
-        element-container audio {
-            background-color: #f0f2f6;
-            border-radius: 0 0 10px 10px;
-            padding: 0 10px 10px 10px;
-            box-shadow: none;
+        /* タイトル部分の装飾 */
+        .my-audio-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+        .music-icon { font-size: 18px; }
+        .music-title {
+            font-weight: bold;
+            color: #1e293b;
+            font-size: 15px;
+        }
+        
+        /* 🔴 標準プレイヤー自体の形や色を、背景になじませるカスタム */
+        .player-wrapper audio {
             width: 100%;
+            height: 40px;
+            border-radius: 8px;
+            background-color: #ffffff; /* バーの背景を白にして浮き立たせる */
+            box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
         }
         </style>
         """,
