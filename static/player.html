@@ -3,7 +3,6 @@
 <head>
     <meta charset="UTF-8">
     <style>
-        /* 画面いっぱいにプレイヤーを表示するためのCSS */
         body { margin: 0; padding: 0; background: transparent; font-family: sans-serif; }
         .player-panel { background: #f0f2f6; padding: 15px; border-radius: 10px; box-sizing: border-box; }
         .time-display { font-family: monospace; margin-top: 5px; color: #31333f; font-size: 14px; }
@@ -13,32 +12,27 @@
 <body>
 
     <div class="player-panel">
+        <!-- Python側で置換されて、ここに選択されたファイル名が入ります -->
         <div id="file-title" style="font-weight: bold; color: #31333f; font-size: 14px;">音声プレイヤー</div>
-        <audio id="audio" controls></audio>
+        
+        <!-- 🔴 Pythonから直接URLが埋め込まれます。srcに最初からデータがあるため、ぐるぐるしません -->
+        <audio id="audio" controls src="%%AUDIO_URL%%"></audio>
         <div class="time-display" id="time-display">00:00 / 00:00</div>
     </div>
 
     <script>
-    function loadAudioFromUrl() {
+    document.addEventListener('DOMContentLoaded', function() {
         const audio = document.getElementById('audio');
         
-        // URLの「?audio=...」の後ろについている音声パスを抜き出す
-        const urlParams = new URLSearchParams(window.location.search);
-        const audioUrl = urlParams.get('audio');
-        
-        if (audioUrl) {
-            console.log("音声を読み込みます: " + audioUrl);
-            audio.src = audioUrl;
-            audio.load();
+        // 現在読み込まれているファイル名をプレイヤーのタイトルに表示する
+        if (audio.src) {
+            const fileName = audio.src.split('/').pop();
+            document.getElementById('file-title').innerText = "再生中: " + decodeURIComponent(fileName);
             
-            // プレイヤーのタイトルを選択されたファイル名に変える（おまけ機能）
-            const fileName = audioUrl.split('/').pop();
-            document.getElementById('file-title').innerText = "再生中: " + fileName;
+            // 自動的に再生を開始したい場合は、以下のコメントアウトを解除してください
+            // audio.play().catch(e => console.log("自動再生がブロックされました"));
         }
-    }
-
-    // ページが開かれたら即座に実行
-    window.onload = loadAudioFromUrl;
+    });
     </script>
 </body>
 </html>
