@@ -1,7 +1,8 @@
 import os
+import pandas as pd
 import streamlit as st
 
-# 1. ページ全体のダークモード設定
+# 1. ページ全体のダークモード風の背景色設定
 st.set_page_config(layout="centered")
 
 st.markdown(
@@ -47,13 +48,21 @@ if available_folders:
     physical_path = os.path.join(STATIC_DIR, selected_folder, f"{selected_file_name}.m4a")
     text_physical_path = os.path.join(STATIC_DIR, selected_folder, f"{selected_file_name}.txt")
 
-    # 🔴【セッション情報の管理】ジャンプ先の秒数を安全に保存
-    if "current_seek" not in st.session_state:
-        st.session_state.current_seek = 0
+    # 🔴【セッション管理】再生開始位置と自動再生フラグを保存
+    if "seek_seconds" not in st.session_state:
+        st.session_state.seek_seconds = 0
+    if "auto_play_flag" not in st.session_state:
+        st.session_state.auto_play_flag = False
 
-    # 🔴【自動再生の解決】start_timeに秒数を渡すと、プレイヤーはその位置から再生可能な状態で即座に立ち上がります
+    # 🔴【完璧な再生連動】
+    # 行がクリックされたら、指定された秒数から「autoplay=True（自動再生）」でプレイヤーを起動します
     st.markdown('<div class="player-panel">', unsafe_allow_html=True)
-    st.audio(physical_path, format="audio/mp4", start_time=st.session_state.current_seek)
+    st.audio(
+        physical_path, 
+        format="audio/mp4", 
+        start_time=st.session_state.seek_seconds,
+        autoplay=st.session_state.auto_play_flag
+    )
     st.markdown('<div class="time-display-mock">00:00 / 12:12</div>', unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
@@ -84,115 +93,100 @@ if available_folders:
         unsafe_allow_html=True
     )
 
-    # 🔴【行全体クリックの解決】
-    # 見た目は通常の美しい文字起こしログですが、裏側は画面を覆う透明な「st.button」を配置しています
-    st.markdown('<div class="log-container">', unsafe_allow_html=True)
-
+    # 🔴【安全なログ解析とデータ化】
+    # テキストファイルを開き、エラーを起こさない頑丈なロジックで表データ（DataFrame）に変換します
+    log_data = []
+    
     if os.path.exists(text_physical_path):
         try:
             with open(text_physical_path, "r", encoding="utf-8") as f:
-                lines = f.readlines()
-                
-            for idx, line in enumerate(lines):
-                line = line.strip()
-                if not line:
-                    continue
-                
-                if line.startswith("[") and "]" in line:
-                    parts = line.split("]", 1)
-                    timestamp_str = parts.replace("[", "").strip()
-                    text = parts.strip()
+                for line in f:
+                    line = line.strip()
+                    if not line or not line.startswith("[") or "]" not in line:
+                        continue
                     
+                    # 確実に [00:25] と テキスト に分離する
+                    idx_close = line.find("]")
+                    timestamp_str = line[1:idx_close].strip() # "00:25"
+                    text_content = line[idx_close+1:].strip() # "トロンボーンだけで..."
+                    
+                    # タイムスタンプを秒数に換算
                     try:
                         time_parts = timestamp_str.split(":")
                         if len(time_parts) == 2:
-                            seconds = int(time_parts[0]) * 60 + int(time_parts[1])
+                            secs = int(time_parts[0]) * 60 + int(time_parts[1])
                         elif len(time_parts) == 3:
-                            seconds = int(time_parts[0]) * 3600 + int(time_parts[1]) * 60 + int(time_parts[2])
+                            secs = int(time_parts[0]) * 3600 + int(time_parts[1]) * 60 + int(time_parts[2])
                         else:
-                            seconds = 0
+                            secs = 0
                     except ValueError:
-                        seconds = 0
-                    
-                    # Streamlitの機能を使って、行全体をカバーする隠しボタンのレイアウトを生成
-                    # 完全にCSSで画像を再現した「行ボタン」として機能します
-                    button_label = f"[{timestamp_str}]  {text}"
-                    
-                    # ボタンが押されたらセッションに秒数を入れ、画面をリフレッシュ
-                    if st.button(button_label, key=f"row_btn_{seconds}_{idx}"):
-                        st.session_state.current_seek = seconds
-                        st.rerun()
-                else:
-                    st.markdown(f'<div class="log-line-normal">{line}</div>', unsafe_allow_html=True)
-        except Exception as e:
-            st.error("ログの読み込みエラーが発生しました。")
+                        secs = 0
+                        
+                    log_data.append({
+                        "Time": f"[{timestamp_str}]",
+                        "Log": text_content,
+                        "seconds_hidden": secs # 裏側で管理するジャンプ用の秒数
+                    })
+        except Exception:
+            st.error("⚠️ テキストファイルの読み込み中にエラーが発生しました。")
+
+    # 🔴【行全体クリックとジャンプの完全実現】
+    # 公式の st.dataframe を表線なし・クリックイベント付きでログ枠として配置します
+    if log_data:
+        df = pd.DataFrame(log_data)
+        
+        # ユーザーが行を選択（クリック）したときのイベントをキャッチ
+        selected_row = st.dataframe(
+            df[["Time", "Log"]], # 画面に見せる列だけを指定
+            hide_index=True,
+            use_container_width=True,
+            on_select="rerun", # クリックしたら瞬時にPythonを動かす設定
+            selection_mode="single-row" # 行全体の選択を許可
+        )
+        
+        # 行が実際にクリックされたら、その行の「seconds_hidden」を取得してプレイヤーをキック
+        if selected_row and len(selected_row.selection.rows) > 0:
+            row_idx = selected_row.selection.rows[0]
+            target_seconds = df.iloc[row_idx]["seconds_hidden"]
+            
+            # セッションに値を保存して自動再生を有効化
+            st.session_state.seek_seconds = int(target_seconds)
+            st.session_state.auto_play_flag = True
+            st.rerun()
+
     else:
-        st.caption("ログファイルが見つかりません。")
+        st.warning("有効なログデータが見つかりません。")
 
-    st.markdown('</div>', unsafe_allow_html=True)
-
-    # 🔴【見た目のハック】Streamlitの無骨なボタンを行全体の美しいクリックUIに変形させるCSS
+    # 🔴 画像通りの色合いに染め上げるCSSカスタム
     st.markdown(
         """
         <style>
         .stApp { background-color: #0e1117 !important; color: #e2e8f0 !important; }
         .section-title { font-weight: bold; color: #ffffff; font-size: 16px; border-left: 4px solid #00b4d8; padding-left: 8px; margin-top: 15px; margin-bottom: 8px; }
-        
-        /* プレイヤー外枠 */
         .player-panel { background-color: #161b22; border: 1px solid #00b4d8; border-radius: 8px; padding: 15px; margin-top: 10px; }
         .player-panel audio { width: 100%; filter: invert(0.9) hue-rotate(180deg); }
         .time-display-mock { text-align: right; color: #00b4d8; font-family: monospace; font-size: 14px; margin-top: 5px; }
         .color-bar { display: flex; height: 15px; border-radius: 4px; overflow: hidden; margin-top: 10px; border: 1px solid #00b4d8; }
         
-        /* ログコンテナ枠 */
-        .log-container { background-color: #161b22; border: 1px solid #21262d; border-radius: 8px; padding: 10px; max-height: 400px; overflow-y: auto; }
-        .log-line-normal { font-size: 14px; color: #8b949e; padding: 6px 12px; font-family: sans-serif; }
-
-        /* 🔴 Streamlitの「st.button」を完全に解体し、画像通りの行全体クリックエリアへ変身させる */
-        div[data-testid="stButton"] {
-            width: 100% !important;
-            margin-bottom: 2px !important;
+        /* 🔴 データフレーム（ログテーブル）を画像のような黒いリストに強制変身させるCSS */
+        div[data-testid="stDataFrame"] {
+            background-color: #161b22 !important;
+            border: 1px solid #21262d !important;
+            border-radius: 8px !important;
+            padding: 5px !important;
         }
-        div[data-testid="stButton"] button {
-            width: 100% !important;
-            background: transparent !important;
-            border: none !important;
-            color: #c9d1d9 !important;
-            text-align: left !important;
-            padding: 8px 12px !important;
-            font-size: 14px !important;
-            font-family: sans-serif !important;
-            border-radius: 4px !important;
-            transition: background-color 0.1s ease !important;
-            justify-content: flex-start !important;
+        /* テーブルのヘッダー（Time, Logという文字）を非表示にしてスッキリさせる */
+        div[data-testid="stDataFrame"] thead { display: none !important; }
+        
+        /* タイムスタンプテキストの文字色を水色にする */
+        div[data-testid="stDataFrame"] td:first-child {
+            color: #00b4d8 !important;
+            font-family: monospace !important;
+            font-weight: bold;
         }
         
-        /* マウスを乗せたときに画像のように背景を明るくし、文字をハイライトする */
-        div[data-testid="stButton"] button:hover {
-            background-color: #21262d !important;
-            color: #ffffff !important;
-        }
-        div[data-testid="stButton"] button:active {
-            background-color: #282e38 !important;
-        }
-
-        /* 🔴 タイムスタンプの部分（文字列の先頭の [00:00] の部分）だけをCSSで水色に染め分ける高度なハック */
-        /* ボタンのテキストの最初の8文字（タイムスタンプ）だけを擬似的に水色として扱います */
-        div[data-testid="stButton"] button div p {
-            font-family: monospace !important;
-            color: #c9d1d9;
-        }
-        /* テキスト表示全体のフォント指定をリセットし、タイムスタンプっぽく見せるための微調整 */
-        div[data-testid="stButton"] button::first-line {
-            color: #00b4d8 !important;
-        }
-
         .mock-btn { background: #21262d; color: #c9d1d9; border: 1px solid #30363d; padding: 4px 12px; border-radius: 4px; font-size: 13px; margin-left: 5px; cursor: pointer; }
         div[data-baseweb="select"] > div { background-color: #161b22 !important; border: 1px solid #30363d !important; color: white !important; }
-
-        /* 🔴【一瞬のフラッシュを目立たなくする工夫】 */
-        /* Streamlitが再描画される際の「白いチラつき」を、サーバーサイドのリラン時にダーク背景のまま固定して吸収します */
-        div[data-testid="stStatusWidget"] { display: none !important; }
         </style>
         """,
         unsafe_allow_html=True
