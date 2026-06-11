@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <style>
+        /* ここにあなたの元のCSSデザイン（player-panelなど）をそのまま貼り付けてください */
+        .player-panel { background: #f0f2f6; padding: 15px; border-radius: 10px; }
+        .time-display { font-family: monospace; margin-top: 5px; }
+    </style>
+</head>
+<body>
+
+    <!-- あなたの元のHTMLレイアウト -->
+    <div class="player-panel">
+        <audio id="audio" controls style="width: 100%;"></audio>
+        <div class="time-display" id="time-display">00:00 / 00:00</div>
+    </div>
+
+    <script>
+    function loadAudioFromUrl() {
+        const audio = document.getElementById('audio');
+        
+        # URLの「?audio=./20260607_airs/airs.m4a」という部分を解析して抜き出す
+        const urlParams = new URLSearchParams(window.location.search);
+        const audioUrl = urlParams.get('audio');
+        
+        if (audioUrl) {
+            console.log("同一オリジンから音声を再生します: " + audioUrl);
+            audio.src = audioUrl;
+            audio.load();
+        }
+    }
+
+    // 画面が表示されたらすぐに実行
+    window.onload = loadAudioFromUrl;
+    </script>
+</body>
+</html>
