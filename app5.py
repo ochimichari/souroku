@@ -5,24 +5,38 @@ st.set_page_config(layout="centered")
 st.markdown('<div style="text-align: center; margin-bottom: 20px;"><h2 style="color: #00b4d8; font-family: sans-serif; letter-spacing: 1px;">奏録 / SOUROKU</h2></div>', unsafe_allow_html=True)
 
 STATIC_DIR = "static"
-available_folders = sorted([f for f in os.listdir(STATIC_DIR) if os.path.isdir(os.path.join(STATIC_DIR, f))]) if os.path.exists(STATIC_DIR) else []
+available_folders = []
+
+# 音声ファイルが物理的に存在するフォルダだけを選択肢に入れる
+if os.path.exists(STATIC_DIR):
+    for folder in os.listdir(STATIC_DIR):
+        folder_path = os.path.join(STATIC_DIR, folder)
+        if os.path.isdir(folder_path):
+            file_name = folder.split("_")[-1] if "_" in folder else folder
+            m4a_path = os.path.join(folder_path, f"{file_name}.m4a")
+            if os.path.exists(m4a_path):
+                available_folders.append(folder)
+
+available_folders.sort()
 
 if available_folders:
     st.markdown('<p class="section-title">Select session</p>', unsafe_allow_html=True)
     selected_folder = st.selectbox("選択してください", options=available_folders, label_visibility="collapsed")
     file_name = selected_folder.split("_")[-1] if "_" in selected_folder else selected_folder
     
+    # 🔴 再生位置と、自動再生用の変数（_アンダーバーあり）を正しく初期化
     if "last_folder" not in st.session_state or st.session_state.last_folder != selected_folder:
         st.session_state.last_folder = selected_folder
         st.session_state.seek_seconds = 0
-        st.session_state.auto_play = False
+        st.session_state.auto_play = False  # ここにアンダーバーを正しく指定
 
     audio_url = f"/static/{selected_folder}/{file_name}.m4a"
     txt_path = os.path.join(STATIC_DIR, selected_folder, f"{file_name}.txt")
     color_txt_path = os.path.join(STATIC_DIR, selected_folder, f"{file_name}_color.txt")
 
+    # 🔴 引数の変数名を st.session_state.auto_play に正しく修正しました
     st.markdown('<div class="player-panel" id="main-audio-root">', unsafe_allow_html=True)
-    st.audio(physical_path:=os.path.join(STATIC_DIR, selected_folder, f"{file_name}.m4a"), format="audio/mp4", start_time=st.session_state.seek_seconds, autoplay=st.session_state.auto_play)
+    st.audio(os.path.join(STATIC_DIR, selected_folder, f"{file_name}.m4a"), format="audio/mp4", start_time=st.session_state.seek_seconds, autoplay=st.session_state.auto_play)
     st.markdown('<div class="time-display-mock" id="time-view">00:00 / 12:12</div><div class="canvas-container"><canvas id="timeline-canvas" height="22"></canvas></div></div>', unsafe_allow_html=True)
     st.markdown('<div id="colorbar-hover-info" style="height: 20px; color: #8b949e; font-family: monospace; font-size: 13px; text-align: center; margin-top: 5px;">バーにマウスを乗せてください</div>', unsafe_allow_html=True)
     st.markdown('<div style="display: flex; justify-content: space-between; align-items: center; margin-top: 25px; margin-bottom: 15px;"><span class="section-title" style="margin:0;">Session Logs</span><div><button class="mock-btn">設定</button><button class="mock-btn" style="background:#00b4d8; color:#0e1117; border:none;">編集</button></div></div>', unsafe_allow_html=True)
@@ -49,6 +63,7 @@ if available_folders:
                     idx_close = line.find("]")
                     color_array_js.append(f"'{line[1:idx_close].strip()}={line[idx_close+1:].strip().upper()}'")
     js_color_str = "[" + ",".join(color_array_js) + "]"
+
     st.markdown(
         f"""
         <script>
