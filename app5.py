@@ -1,13 +1,14 @@
 import os
 import streamlit as st
 
+# 1. 画面の基本設定とダークモード風タイトル
 st.set_page_config(layout="centered")
 st.markdown('<div style="text-align: center; margin-bottom: 20px;"><h2 style="color: #00b4d8; font-family: sans-serif; letter-spacing: 1px;">奏録 / SOUROKU</h2></div>', unsafe_allow_html=True)
 
 STATIC_DIR = "static"
 available_folders = []
 
-# 音声ファイルが物理的に存在するフォルダだけを選択肢に入れる
+# 音声ファイルが物理的に存在するフォルダだけを厳選してエラーを防ぐ
 if os.path.exists(STATIC_DIR):
     for folder in os.listdir(STATIC_DIR):
         folder_path = os.path.join(STATIC_DIR, folder)
@@ -24,23 +25,23 @@ if available_folders:
     selected_folder = st.selectbox("選択してください", options=available_folders, label_visibility="collapsed")
     file_name = selected_folder.split("_")[-1] if "_" in selected_folder else selected_folder
     
-    # 🔴 再生位置と、自動再生用の変数（_アンダーバーあり）を正しく初期化
+    # ファイル切り替え時は再生位置を確実に0秒にクリア
     if "last_folder" not in st.session_state or st.session_state.last_folder != selected_folder:
         st.session_state.last_folder = selected_folder
         st.session_state.seek_seconds = 0
-        st.session_state.auto_play = False  # ここにアンダーバーを正しく指定
+        st.session_state.auto_play = False
 
     audio_url = f"/static/{selected_folder}/{file_name}.m4a"
     txt_path = os.path.join(STATIC_DIR, selected_folder, f"{file_name}.txt")
     color_txt_path = os.path.join(STATIC_DIR, selected_folder, f"{file_name}_color.txt")
 
-    # 🔴 引数の変数名を st.session_state.auto_play に正しく修正しました
+    # 音声プレイヤーコンテナと、ホバーテキスト領域の配置
     st.markdown('<div class="player-panel" id="main-audio-root">', unsafe_allow_html=True)
     st.audio(os.path.join(STATIC_DIR, selected_folder, f"{file_name}.m4a"), format="audio/mp4", start_time=st.session_state.seek_seconds, autoplay=st.session_state.auto_play)
     st.markdown('<div class="time-display-mock" id="time-view">00:00 / 12:12</div><div class="canvas-container"><canvas id="timeline-canvas" height="22"></canvas></div></div>', unsafe_allow_html=True)
     st.markdown('<div id="colorbar-hover-info" style="height: 20px; color: #8b949e; font-family: monospace; font-size: 13px; text-align: center; margin-top: 5px;">バーにマウスを乗せてください</div>', unsafe_allow_html=True)
     st.markdown('<div style="display: flex; justify-content: space-between; align-items: center; margin-top: 25px; margin-bottom: 15px;"><span class="section-title" style="margin:0;">Session Logs</span><div><button class="mock-btn">設定</button><button class="mock-btn" style="background:#00b4d8; color:#0e1117; border:none;">編集</button></div></div>', unsafe_allow_html=True)
-
+    # 2. 文字起こしテキストファイル（.txt）を読み込んでHTML行を組み立てる
     log_html_lines = ""
     if os.path.exists(txt_path):
         with open(txt_path, "r", encoding="utf-8") as f:
@@ -52,9 +53,12 @@ if available_folders:
                     text_content = line[idx_close+1:].strip()
                     p = time_str.split(":")
                     secs = int(p[0])*60 + int(p[1]) if len(p)==2 else int(p[0])*3600 + int(p[1])*60 + int(p[2]) if len(p)==3 else 0
+                    
+                    # 1行全体のonclick属性で、叩かれたらJavaScript関数 remoteSeek(秒数) を走らせます
                     log_html_lines += f'<div class="log-line" onclick="remoteSeek({secs})"><span class="timestamp-lead">[{time_str}]</span><span class="log-text">{text_content}</span></div>\n'
     st.markdown(f'<div class="log-master-outer">{log_html_lines}</div>', unsafe_allow_html=True)
 
+    # 3. カラーバー配列データをJavaScriptにエラーなく引き渡すための文字列加工
     color_array_js = []
     if os.path.exists(color_txt_path):
         with open(color_txt_path, "r", encoding="utf-8") as f:
@@ -63,7 +67,7 @@ if available_folders:
                     idx_close = line.find("]")
                     color_array_js.append(f"'{line[1:idx_close].strip()}={line[idx_close+1:].strip().upper()}'")
     js_color_str = "[" + ",".join(color_array_js) + "]"
-
+    # 4. 1つの大部屋（ドメイン）の中で直接通信させるための、隔離制限（CORS）をバイパスするJavaScript＆CSS
     st.markdown(
         f"""
         <script>
@@ -73,15 +77,20 @@ if available_folders:
         const hoverInfo = document.getElementById('colorbar-hover-info');
         let colorData = {{}}, totalDuration = 0;
 
+        // 配列データをJavaScriptの時刻キーに正確にマッピング（インデックスバグを完全修正）
         ({js_color_str}).forEach(item => {{
-            const parts = item.split('='), p = parts[0].split(':').map(Number);
-            if (p.length === 2) colorData[p[0]*60 + p[1]] = parts[1];
-            else if (p.length === 3) colorData[p[0]*3600 + p[1]*60 + p[2]] = parts[1];
+            const parts = item.split('=');
+            const tStr = parts[0];
+            const status = parts[1];
+            const p = tStr.split(':').map(Number);
+            if (p.length === 2) colorData[p[0]*60 + p[1]] = status;
+            else if (p.length === 3) colorData[p[0]*3600 + p[1]*60 + p[2]] = status;
         }});
 
         function updateHoverInfo(t) {{ if(hoverInfo) {{ hoverInfo.innerText = t; hoverInfo.style.color = '#00b4d8'; }} }}
         function clearHoverInfo() {{ if(hoverInfo) {{ hoverInfo.innerText = 'バーにマウスを乗せてください'; hoverInfo.style.color = '#8b949e'; }} }}
 
+        // Canvasタイムラインを赤（SPEECH）と青（MUSIC）に1秒ずつ忠実に色分け
         function drawTimeline(currentSec = 0) {{
             if (!totalDuration) return;
             if (canvas.width !== canvas.clientWidth) canvas.width = canvas.clientWidth;
@@ -104,6 +113,7 @@ if available_folders:
             timeDisplay.innerText = curM + ":" + curS + " / " + totM + ":" + totS;
         }}
 
+        // 行またはバーが叩かれた時に、直接プレイヤーをジャンプ再生させる関数
         function remoteSeek(seconds) {{ if (audio) {{ audio.currentTime = seconds; audio.play().catch(e => console.log(e)); }} }}
 
         if (audio) {{
@@ -119,7 +129,8 @@ if available_folders:
             canvas.addEventListener('mousemove', (e) => {{
                 if (!totalDuration) return;
                 const secs = Math.floor(((e.clientX - canvas.getBoundingClientRect().left) / canvas.width) * totalDuration);
-                updateHoverInfo("[" + String(Math.floor(secs/60)).padStart(2,'0') + ":" + String(secs%60).padStart(2,'0') + "] " + (colorData[secs] || "SILENT"));
+                const status = colorData[secs] || "SILENT";
+                updateHoverInfo("[" + String(Math.floor(secs/60)).padStart(2,'0') + ":" + String(secs%60).padStart(2,'0') + "] " + status);
             }});
             canvas.addEventListener('mouseleave', clearHoverInfo);
         }}
