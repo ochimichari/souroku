@@ -1,7 +1,7 @@
 import os
 import streamlit as st
 
-# 1. ページ全体をダークモード風の背景色に固定するためのCSS設定
+# ページ設定
 st.set_page_config(layout="centered")
 
 st.markdown(
@@ -32,12 +32,12 @@ if os.path.exists(STATIC_DIR):
 if available_folders:
     available_folders.sort()
     
-    # 2. セレクトボックス部分（青い縦線付きのラベルを配置）
+    # セレクトボックス部分
     st.markdown('<p class="section-title">Select session</p>', unsafe_allow_html=True)
     selected_folder = st.selectbox(
         "再生する音声を選択してください", 
         options=available_folders,
-        label_visibility="collapsed" # 標準のラベルは隠す
+        label_visibility="collapsed"
     )
     
     if "_" in selected_folder:
@@ -46,16 +46,16 @@ if available_folders:
         selected_file_name = selected_folder
         
     physical_path = os.path.join(STATIC_DIR, selected_folder, f"{selected_file_name}.m4a")
+    # 🔴 テキストファイルの物理パスを計算 (例: static/20260607_airs/airs.txt)
+    text_physical_path = os.path.join(STATIC_DIR, selected_folder, f"{selected_file_name}.txt")
 
-    # 3. オーディオプレイヤーを包むパネル枠
+    # オーディオプレイヤーを包むパネル枠
     st.markdown('<div class="player-panel">', unsafe_allow_html=True)
     st.audio(physical_path, format="audio/mp4")
-    
-    # 画像にある「00:00 / 12:12」のような水色の時間表示を再現
     st.markdown('<div class="time-display-mock">00:00 / 12:12</div>', unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # カラフルなインジケーター（ダミーのビジュアル要素として配置）
+    # カラフルなインジケーター（ダミー）
     st.markdown(
         """
         <div class="color-bar">
@@ -69,7 +69,7 @@ if available_folders:
         unsafe_allow_html=True
     )
 
-    # 4. ログセクション（Session Logs）の再現
+    # ログセクション（Session Logs）のヘッダー部分
     st.markdown(
         """
         <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 25px; margin-bottom: 15px;">
@@ -83,126 +83,60 @@ if available_folders:
         unsafe_allow_html=True
     )
 
-    # 画像に表示されている文字起こしテキストの再現（スクロール付きの黒い枠）
+    # 🔴 選択されたフォルダ内のテキストファイル（.txt）を自動で読み込んでHTMLを組み立てる処理
+    log_html_content = ""
+    
+    if os.path.exists(text_physical_path):
+        try:
+            with open(text_physical_path, "r", encoding="utf-8") as f:
+                lines = f.readlines()
+                
+            for line in lines:
+                line = line.strip()
+                if not line:
+                    continue
+                
+                # 行の先頭が「[00:25]」などのタイムスタンプ形式になっているか簡易チェックして分解
+                if line.startswith("[") and "]" in line:
+                    parts = line.split("]", 1)
+                    timestamp = parts[0] + "]" # [00:25]
+                    text = parts[1].strip()     # トロンボーンだけで行きましょう
+                    
+                    log_html_content += f'<div class="log-line"><span class="timestamp">{timestamp}</span> {text}</div>\n'
+                else:
+                    # タイムスタンプの形になっていない行はそのまま表示
+                    log_html_content += f'<div class="log-line">{line}</div>\n'
+        except Exception as e:
+            log_html_content = f'<div class="log-line" style="color: #ff4b4b;">ファイルの読み込み中にエラーが発生しました。</div>'
+    else:
+        # テキストファイルがまだ用意されていない場合のメッセージ
+        log_html_content = f'<div class="log-line" style="color: #8b949e; font-style: italic;">ログファイルが見つかりません: {selected_file_name}.txt</div>'
+
+    # スクロール付きの黒い枠の中に、自動生成したテキストログを流し込む
     st.markdown(
-        """
+        f"""
         <div class="log-container">
-            <div class="log-line"><span class="timestamp">[00:25]</span> トロンボーンだけで行きましょう</div>
-            <div class="log-line"><span class="timestamp">[00:36]</span> 今日トロンボーン7人来てくれました</div>
-            <div class="log-line"><span class="timestamp">[00:42]</span> 素晴らしい</div>
-            <div class="log-line"><span class="timestamp">[00:46]</span> 素晴らしいですね</div>
-            <div class="log-line"><span class="timestamp">[00:53]</span> ちょっと熱いな</div>
-            <div class="log-line"><span class="timestamp">[02:12]</span> 基礎合奏気分で、よく鳴らしていきましょう。</div>
-            <div class="log-line"><span class="timestamp">[02:16]</span> この曲はハッキリ短くて、タカタカタカタ、ダンダガダガダンダンではないです。</div>
-            <div class="log-line"><span class="timestamp">[02:56]</span> メロディーも伴奏も、あと音の長さ半分にできますか？</div>
-            <div class="log-line"><span class="timestamp">[03:02]</span> 半分にするためには息のスピードが必要なんですよね。</div>
-            <div class="log-line"><span class="timestamp">[03:11]</span> 長いでしょう？</div>
-            <div class="log-line"><span class="timestamp">[03:14]</span> スピードが絶対必要になるからね</div>
-            <div class="log-line"><span class="timestamp">[03:20]</span> 裏拍の人です</div>
+            {log_html_content}
         </div>
         """,
         unsafe_allow_html=True
     )
 
-    # 🔴 画像の「黒基調・水色アクセント」を完全に適用するCSS
+    # 配色のCSS設定（ここは前回と同じです）
     st.markdown(
         """
         <style>
-        /* ページ全体の背景と文字色をダークに矯正 */
-        .stApp {
-            background-color: #0e1117 !important;
-            color: #e2e8f0 !important;
-        }
-        
-        /* 青い縦線の入ったタイトルラベル */
-        .section-title {
-            font-weight: bold;
-            color: #ffffff;
-            font-size: 16px;
-            border-left: 4px solid #00b4d8;
-            padding-left: 8px;
-            margin-top: 15px;
-            margin-bottom: 8px;
-        }
-
-        /* プレイヤーを囲む黒いパネル枠（水色の境界線） */
-        .player-panel {
-            background-color: #161b22;
-            border: 1px solid #00b4d8;
-            border-radius: 8px;
-            padding: 15px;
-            margin-top: 10px;
-        }
-        
-        /* プレイヤー自体の透過カスタム */
-        .player-panel audio {
-            width: 100%;
-            filter: invert(0.9) hue-rotate(180deg); /* プレイヤーをダーク化しつつ水色になじませる */
-        }
-        
-        /* 水色の時間表示テキスト */
-        .time-display-mock {
-            text-align: right;
-            color: #00b4d8;
-            font-family: monospace;
-            font-size: 14px;
-            margin-top: 5px;
-        }
-
-        /* カラフルなインジケーターのバー */
-        .color-bar {
-            display: flex;
-            height: 15px;
-            border-radius: 4px;
-            overflow: hidden;
-            margin-top: 10px;
-            border: 1px solid #00b4d8;
-        }
-
-        /* セッションログのスクロール枠 */
-        .log-container {
-            background-color: #161b22;
-            border: 1px solid #21262d;
-            border-radius: 8px;
-            padding: 15px;
-            max-height: 400px;
-            overflow-y: auto;
-        }
-        
-        /* ログの1行ごとの装飾 */
-        .log-line {
-            font-size: 14px;
-            color: #c9d1d9;
-            margin-bottom: 16px;
-            line-height: 1.5;
-            font-family: sans-serif;
-        }
-        
-        /* タイムスタンプ [00:25] のグレー文字 */
-        .timestamp {
-            color: #8b949e;
-            font-family: monospace;
-            margin-right: 8px;
-        }
-
-        /* 右上のダミーボタン */
-        .mock-btn {
-            background: #21262d;
-            color: #c9d1d9;
-            border: 1px solid #30363d;
-            padding: 4px 12px;
-            border-radius: 4px;
-            font-size: 13px;
-            margin-left: 5px;
-            cursor: pointer;
-        }
-        
-        /* Streamlit標準のセレクトボックスの見た目をダーク化 */
-        div[data-baseweb="select"] > div {
-            background-color: #161b22 !important;
-            border: 1px solid #30363d !important;
-            color: white !important;
-        }
+        .stApp { background-color: #0e1117 !important; color: #e2e8f0 !important; }
+        .section-title { font-weight: bold; color: #ffffff; font-size: 16px; border-left: 4px solid #00b4d8; padding-left: 8px; margin-top: 15px; margin-bottom: 8px; }
+        .player-panel { background-color: #161b22; border: 1px solid #00b4d8; border-radius: 8px; padding: 15px; margin-top: 10px; }
+        .player-panel audio { width: 100%; filter: invert(0.9) hue-rotate(180deg); }
+        .time-display-mock { text-align: right; color: #00b4d8; font-family: monospace; font-size: 14px; margin-top: 5px; }
+        .color-bar { display: flex; height: 15px; border-radius: 4px; overflow: hidden; margin-top: 10px; border: 1px solid #00b4d8; }
+        .log-container { background-color: #161b22; border: 1px solid #21262d; border-radius: 8px; padding: 15px; max-height: 400px; overflow-y: auto; }
+        .log-line { font-size: 14px; color: #c9d1d9; margin-bottom: 16px; line-height: 1.5; font-family: sans-serif; }
+        .timestamp { color: #8b949e; font-family: monospace; margin-right: 8px; }
+        .mock-btn { background: #21262d; color: #c9d1d9; border: 1px solid #30363d; padding: 4px 12px; border-radius: 4px; font-size: 13px; margin-left: 5px; cursor: pointer; }
+        div[data-baseweb="select"] > div { background-color: #161b22 !important; border: 1px solid #30363d !important; color: white !important; }
         </style>
         """,
         unsafe_allow_html=True
