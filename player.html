@@ -9,17 +9,13 @@ function initPlayer() {
     const audio = document.getElementById('audio');
     const url = window.audioUrlFromPython;
     
-    // URLが正常（空文字でなく、変な文字列でない）場合のみ読み込む
-    if (url && url !== "/static//.m4a") {
+    if (url) {
         console.log("音声URLを読み込みます: " + url);
         audio.src = url;
         audio.load();
-    } else {
-        console.log("有効な音声URLがまだ届いていません。");
     }
 }
 
-// 画面読み込み時にも念のためチェック
+// 画面切り替え（再レンダリング）時にも対応できるようにイベントを設定
 document.addEventListener('DOMContentLoaded', initPlayer);
 </script>
-
