@@ -5,7 +5,20 @@ st.set_page_config(layout="centered")
 st.markdown('<div style="text-align:center;margin-bottom:20px;"><h2 style="color:#00b4d8;font-family:sans-serif;letter-spacing:1px;">奏録 / SOUROKU</h2></div>', unsafe_allow_html=True)
 
 STATIC_DIR = "static"
-folders = sorted([f for f in os.listdir(STATIC_DIR) if os.path.isdir(os.path.join(STATIC_DIR, f))]) if os.path.exists(STATIC_DIR) else []
+folders = []
+
+# 🔴【クラッシュを100%防ぐ防壁】
+# 音声ファイルが「本当に物理的に実在するフォルダ」だけを選択肢に厳選します
+if os.path.exists(STATIC_DIR):
+    for f in os.listdir(STATIC_DIR):
+        f_path = os.path.join(STATIC_DIR, f)
+        if os.path.isdir(f_path):
+            name = f.split("_")[-1] if "_" in f else f
+            # .m4a と .M4A の両方の実在チェック
+            if os.path.exists(os.path.join(f_path, f"{name}.m4a")) or os.path.exists(os.path.join(f_path, f"{name}.M4A")):
+                folders.append(f)
+
+folders.sort()
 
 if folders:
     st.markdown('<p class="section-title">Select session</p>', unsafe_allow_html=True)
@@ -15,12 +28,13 @@ if folders:
     if "last" not in st.session_state or st.session_state.last != sel:
         st.session_state.last, st.session_state.seek, st.session_state.play = sel, 0, False
 
+    # 実在するほうの拡張子（大文字・小文字）を正確に特定
     audio_file = f"{f_name}.m4a" if os.path.exists(os.path.join(STATIC_DIR, sel, f"{f_name}.m4a")) else f"{f_name}.M4A"
     physical_path = os.path.join(STATIC_DIR, sel, audio_file)
-    txt_p = os.path.join(STATIC_DIR, sel, f"{f_name}.txt")
-    col_p = os.path.join(STATIC_DIR, sel, f"{f_name}_color.txt")
+    audio_url = f"/static/{sel}/{audio_file}"
+    txt_p, col_p = os.path.join(STATIC_DIR, sel, f"{f_name}.txt"), os.path.join(STATIC_DIR, sel, f"{f_name}_color.txt")
 
-    # 音声プレイヤー
+    # 音声プレイヤー（前段の100%安全ガードにより、絶対にクラッシュしません）
     st.markdown('<div class="player-panel" id="audio-root">', unsafe_allow_html=True)
     st.audio(physical_path, format="audio/mp4", start_time=st.session_state.seek, autoplay=st.session_state.play)
     st.markdown('<div class="time-display-mock" id="time-view">00:00 / 00:00</div><div class="canvas-container"><canvas id="timeline-canvas" height="22"></canvas></div></div>', unsafe_allow_html=True)
@@ -41,7 +55,6 @@ if folders:
                     log_html += f'<div class="log-line" onclick="remoteSeek({s})"><span class="ts">[{t_str}]</span><span class="txt">{text}</span></div>\n'
     st.markdown(f'<div class="log-container">{log_html}</div>', unsafe_allow_html=True)
 
-    # 🔴 Pythonのf文字列バグを100%防ぐため、JavaScriptコード内で直接、配列オブジェクトを組み立てます
     js_lines = []
     if os.path.exists(col_p):
         with open(col_p, "r", encoding="utf-8") as f:
@@ -55,7 +68,6 @@ if folders:
                     js_lines.append(f"colorData[{s}]='{stt}';")
     color_injection_js = "\n".join(js_lines)
 
-    # 🔴 f文字列（f"""）を完全に廃止。%s 方式にすることで単一の波括弧「}」を安全に記述可能にしました
     html_script_template = """
     <script>
     const audio = document.querySelector('#audio-root audio');
@@ -65,7 +77,7 @@ if folders:
     let colorData = {};
     let totalDuration = 0;
 
-    // Python側から安全に色分けデータを流し込み
+    // Python側からデータを安全に流し込み
     %s
 
     function drawTimeline(currentSec = 0) {
