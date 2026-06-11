@@ -1,14 +1,12 @@
 import os
 import streamlit as st
 
-# 画面設定
 st.set_page_config(layout="centered")
 st.markdown('<div style="text-align: center; margin-bottom: 20px;"><h2 style="color: #00b4d8; font-family: sans-serif; letter-spacing: 1px;">奏録 / SOUROKU</h2></div>', unsafe_allow_html=True)
 
 STATIC_DIR = "static"
 available_folders = []
 
-# 音声ファイルが物理的に存在するフォルダだけを選択肢に入れる
 if os.path.exists(STATIC_DIR):
     for folder in os.listdir(STATIC_DIR):
         folder_path = os.path.join(STATIC_DIR, folder)
@@ -26,7 +24,6 @@ if available_folders:
     
     file_name = selected_folder.split("_")[-1] if "_" in selected_folder else selected_folder
     
-    # ファイル切り替え時にタイマーを0秒にクリア
     if "last_folder" not in st.session_state or st.session_state.last_folder != selected_folder:
         st.session_state.last_folder = selected_folder
         st.session_state.seek_seconds = 0
@@ -41,7 +38,7 @@ if available_folders:
     st.audio(physical_path, format="audio/mp4", start_time=st.session_state.seek_seconds, autoplay=st.session_state.auto_play)
     st.markdown('<div class="time-display-mock">00:00 / 12:12</div></div>', unsafe_allow_html=True)
 
-    # 【カラーバーの復活】1秒ごとに赤（SPEECH）と青（MUSIC）に染め分けるHTMLを生成
+    # 1秒ごとに赤（SPEECH）と青（MUSIC）に染め分けるカラーバーの生成
     colorbar_inner_html = ""
     if os.path.exists(color_txt_path):
         with open(color_txt_path, "r", encoding="utf-8") as f:
@@ -59,26 +56,21 @@ if available_folders:
                         else: secs = idx
                     except: secs = idx
 
-                    # 色の割り当て（SPEECH=赤, MUSIC=青）
                     color_code = "#ff4b4b" if "SPEECH" in status else "#00b4d8" if "MUSIC" in status else "#30363d"
-                    
-                    # 各マスのonclickで、下の対応するログボタンを代わりにリモートクリックさせます
-                    colorbar_inner_html += f'<div class="bar-tick" style="background: {color_code} !important;" onclick="triggerLogClick({secs});" onmouseover="updateHoverInfo(\'[{time_str}] {status}\')" onmouseout="clearHoverInfo()"></div>'
+                    colorbar_inner_html += f'<div class="bar-tick" style="background: {color_code};" onclick="triggerLogClick({secs});" onmouseover="updateHoverInfo(\'[{time_str}] {status}\')" onmouseout="clearHoverInfo()"></div>'
 
-    # ホバーテキストエリア
+    # ホバーテキスト
     st.markdown('<div id="colorbar-hover-info" style="height: 20px; color: #8b949e; font-family: monospace; font-size: 13px; text-align: center; margin-top: 5px;">バーにマウスを乗せてください</div>', unsafe_allow_html=True)
 
-    # 本物のカラーバーを描画
     if colorbar_inner_html:
         st.markdown(f'<div class="color-bar-container">{colorbar_inner_html}</div>', unsafe_allow_html=True)
 
-    # ログセクションヘッダー
     st.markdown('<div style="display: flex; justify-content: space-between; align-items: center; margin-top: 25px; margin-bottom: 15px;"><span class="section-title" style="margin:0;">Session Logs</span><div><button class="mock-btn">設定</button><button class="mock-btn" style="background:#00b4d8; color:#0e1117; border:none;">編集</button></div></div>', unsafe_allow_html=True)
 
-    # ログ枠コンテナの開始（一番よく動いて幅いっぱいになっていた構造に戻しました）
+    # ログ全体の外枠コンテナ
     st.markdown('<div class="log-master-outer">', unsafe_allow_html=True)
 
-    # ログリスト（st.button）を表示
+    # ログリストの表示
     if os.path.exists(txt_path):
         with open(txt_path, "r", encoding="utf-8") as f:
             for idx, line in enumerate(f):
@@ -95,32 +87,28 @@ if available_folders:
                         else: secs = 0
                     except: secs = 0
                     
-                    # 以前最もよく動いていた本物の st.button による文字起こし行
                     if st.button(f"[{time_str}]  {text_content}", key=f"row_{secs}_{idx}"):
                         st.session_state.seek_seconds = secs
                         st.session_state.auto_play = True
                         st.rerun()
 
     st.markdown('</div>', unsafe_allow_html=True)
-    # 🔴【後半】ホバー表示＆100%バグらないボタン探索JavaScript
-    # 🔴【後半】ホバー表示＆100%バグらないボタン探索JavaScript（バグ修正版）
+    # リモートクリック中継用のJavaScript
     st.markdown(
         """
         <script>
         function updateHoverInfo(t){var e=document.getElementById("colorbar-hover-info");e&&(e.innerText=t,e.style.color="#00b4d8")}
         function clearHoverInfo(){var t=document.getElementById("colorbar-hover-info");t&&(t.innerText="バーにマウスを乗せてください",t.style.color="#8b949e")}
         
-        // カラーバーのクリック時に、ログ内の「同じ秒数」のボタンを確実に探してクリックを中継する関数
         function triggerLogClick(targetSec) {
             const buttons = document.querySelectorAll('div[data-testid="stButton"] button');
             for (let btn of buttons) {
                 const txt = btn.textContent || btn.innerText || "";
                 if (txt.includes('[') && txt.includes(']')) {
-                    const rawTime = txt.split(']')[0].replace('[', '').trim();
+                    const rawTime = txt.split(']').replace('[', '').trim();
                     const timeParts = rawTime.split(':');
                     let btnSec = 0;
                     
-                    // 🔴 配列のインデックス指定（[0],[1],[2]）を正確に修正しました
                     if (timeParts.length === 2) {
                         btnSec = parseInt(timeParts[0], 10) * 60 + parseInt(timeParts[1], 10);
                     } else if (timeParts.length === 3) {
@@ -128,7 +116,7 @@ if available_folders:
                     }
                     
                     if (btnSec === targetSec) {
-                        btn.click(); // 安全に本物ボタンをキックしてジャンプ
+                        btn.click();
                         break;
                     }
                 }
@@ -139,7 +127,7 @@ if available_folders:
         unsafe_allow_html=True
     )
 
-    # 🔴 外枠が絶対に縮まない横幅100%固定と、行全体クリックの魔改造CSS
+    # 外枠を維持し、行全体クリック化させるCSS
     st.markdown(
         """
         <style>
@@ -149,8 +137,7 @@ if available_folders:
         .player-panel audio { width: 100%; filter: invert(0.9) hue-rotate(180deg); }
         .time-display-mock { text-align: right; color: #00b4d8; font-family: monospace; font-size: 14px; margin-top: 5px; }
         
-        /* カラーバー自体の横幅100%固定設定 */
-        .color-bar-container { display: flex !important; height: 18px; border-radius: 4px; overflow: hidden; border: 1px solid #00b4d8; margin-top: 5px; margin-bottom: 5px; background-color: #161b22; width: 100% !important; box-sizing: border-box; }
+        .color-bar-container { display: flex; height: 18px; border-radius: 4px; overflow: hidden; border: 1px solid #00b4d8; margin-top: 5px; margin-bottom: 5px; background-color: #161b22; width: 100% !important; box-sizing: border-box; }
         .bar-tick { flex: 1; height: 100%; cursor: pointer; }
         .bar-tick:hover { opacity: 0.4; background-color: #ffffff !important; }
 
@@ -167,7 +154,7 @@ if available_folders:
             box-sizing: border-box;
         }
         
-        /* Streamlitの自動縮小配置コンテナを力技で幅100%に広げるハック */
+        /* Streamlitの自動縮小配置コンテナを幅100%に広げるハック */
         div.log-master-outer div[data-testid="element-container"],
         div.log-master-outer div[data-testid="stButton"] { 
             width: 100% !important; 
@@ -195,4 +182,3 @@ if available_folders:
     )
 else:
     st.warning("`static` フォルダ内に有効な音声フォルダが見つかりません。")
-
