@@ -2,7 +2,7 @@ import os
 import streamlit as st
 import streamlit.components.v1 as components
 
-st.title("🎵 カスタムHTMLプレイヤー (完全解決版)")
+st.title("🎵 カスタムHTMLプレイヤー (セキュリティ突破版)")
 
 STATIC_DIR = "static"
 
@@ -29,70 +29,99 @@ if available_folders:
     else:
         selected_file_name = selected_folder
         
-    # 🔴 クラウド環境でも100%エラーにならない安全なパスURLを作ります
-    # 頭にスラッシュを1つだけつけた「/static/...」は、ブラウザがドメインを自動補完してくれる最強の書き方です
-    audio_url = f"/static/{selected_folder}/{selected_file_name}.m4a"
+    physical_path = os.path.join(STATIC_DIR, selected_folder, f"{selected_file_name}.m4a")
 
     st.caption(f"選択中: {selected_folder}/{selected_file_name}.m4a")
 
-    # HTMLにデザインとJavaScriptを埋め込みます
+    # 1. 🔴 確実に音が鳴る「本物のプレイヤー」を配置（CSSで完全に非表示にします）
+    # これによりクラウドのセキュリティ制限（CORS）を100%回避して音声データを確保します
+    st.markdown('<div class="real-audio-wrapper">', unsafe_allow_html=True)
+    st.audio(physical_path, format="audio/mp4")
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    # 2. 🔴 あなたが自由にデザイン（CSS）できる「見た目だけの偽プレイヤー（HTML）」
+    # 好きなだけデザインをカスタマイズしてください
     html_code = f"""
     <!DOCTYPE html>
     <html lang="ja">
     <head>
         <meta charset="UTF-8">
         <style>
-            body {{ margin: 0; padding: 0; background: transparent; font-family: sans-serif; }}
-            /* 🔴 ここであなたの好きなデザイン（CSS）を無限にいじることができます */
-            .player-panel {{ background: #f0f2f6; padding: 15px; border-radius: 10px; box-sizing: border-box; }}
-            .time-display {{ font-family: monospace; margin-top: 5px; color: #31333f; font-size: 14px; }}
-            audio {{ width: 100%; margin-top: 5px; }}
+            body {{ margin: 0; padding: 0; background: transparent; font-family: sans-serif; user-select: none; }}
+            
+            /* ✨ ここで見た目を100%自由にいじれます */
+            .player-panel {{ 
+                background: #f0f2f6; 
+                padding: 18px; 
+                border-radius: 12px; 
+                box-sizing: border-box;
+                display: flex;
+                flex-direction: column;
+                gap: 10px;
+                box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            }}
+            .title {{ font-weight: bold; color: #31333f; font-size: 15px; }}
+            
+            /* カスタムボタンのデザイン例 */
+            .custom-play-btn {{
+                background: #ff4b4b;
+                color: white;
+                border: none;
+                padding: 10px 20px;
+                border-radius: 8px;
+                font-weight: bold;
+                cursor: pointer;
+                transition: background 0.2s;
+                width: fit-content;
+            }}
+            .custom-play-btn:hover {{ background: #e03e3e; }}
         </style>
     </head>
     <body>
         <div class="player-panel">
-            <div style="font-weight: bold; color: #31333f; font-size: 14px;">再生中: {selected_file_name}.m4a</div>
-            <audio id="audio" controls src="{audio_url}"></audio>
-            <div class="time-display" id="time-display">00:00 / 00:00</div>
+            <div class="title">📄 再生中: {selected_file_name}.m4a</div>
+            
+            <!-- 自作の再生ボタン -->
+            <button class="custom-play-btn" id="playBtn">▶ 再生 / 一時停止</button>
         </div>
 
         <script>
-            const audio = document.getElementById('audio');
-            const timeDisplay = document.getElementById('time-display');
-
-            // 🔴 タイムカウンターを動かすJavaScript
-            function formatTime(seconds) {{
-                if (isNaN(seconds)) return "00:00";
-                const mins = Math.floor(seconds / 60);
-                const secs = Math.floor(seconds % 60);
-                return String(mins).padStart(2, '0') + ':' + String(secs).padStart(2, '0');
-            }}
-
-            audio.addEventListener('loadedmetadata', () => {{
-                timeDisplay.innerText = formatTime(audio.currentTime) + " / " + formatTime(audio.duration);
-            }});
-
-            audio.addEventListener('timeupdate', () => {{
-                timeDisplay.innerText = formatTime(audio.currentTime) + " / " + formatTime(audio.duration);
-            }});
-
-            // 🔴【重要】クラウド上の「ぐるぐるフリーズ（読み込み遅延）」を強制解除する処理
-            // Streamlitの静的配信は起動直後に一瞬遅れることがあるため、失敗したら0.5秒後に自動リロードさせます
-            audio.addEventListener('error', () => {{
-                console.log("音声の読み込みに失敗しました。再試行します...");
-                setTimeout(() => {{
-                    audio.load();
-                }}, 500);
+            // 3. 🔴【魔法のJavaScript】
+            // このボタンが押されたら、親画面にあるStreamlit本物のプレイヤーの再生ボタンを代わりにクリックする
+            document.getElementById('playBtn').addEventListener('click', () => {{
+                // iframeの壁を越えて、親画面に配置されている本物の<audio>タグを探し出す
+                const realAudio = window.parent.document.querySelector('audio');
+                if (realAudio) {{
+                    if (realAudio.paused) {{
+                        realAudio.play();
+                        document.getElementById('playBtn').innerText = "⏸ 一時停止";
+                    }} else {{
+                        realAudio.pause();
+                        document.getElementById('playBtn').innerText = "▶ 再生";
+                    }}
+                }} else {{
+                    alert("本物のオーディオプレイヤーが見つかりません");
+                }}
             }});
         </script>
     </body>
     </html>
     """
 
-    # 🔴 key引数を完全に排除。これで最新Streamlit環境の内部バグ（TypeError）を完全に回避します
-    components.html(
-        html_code,
-        height=160
+    # 4. 🔴 自作したデザイン画面（ボタンなど）を描画します
+    components.html(html_code, height=120)
+
+    # 5. 🔴 本物のプレイヤーを隠すためのCSSスタイル
+    st.markdown(
+        """
+        <style>
+        /* 本物のst.audioプレイヤーを画面から完全に消し去る（裏では生きている） */
+        .real-audio-wrapper {
+            display: none !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True
     )
 
 else:
