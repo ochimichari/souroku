@@ -1,45 +1,45 @@
 import os
 import streamlit as st
+import streamlit.components.v1 as components
 
-# アプリのタイトル
-st.title("🎵 サーバ音声ファイルプレイヤー")
+st.title("🎵 カスタムHTMLプレイヤー")
 
-# 音声ファイルが保存されているフォルダのパス
-AUDIO_DIR = "audio_files"
+# テスト用の入力欄（例: "groupA" など）
+folder_name = st.text_input("フォルダ名を入力してください", value="groupA")
 
-# フォルダが存在しない場合は自動作成
-if not os.path.exists(AUDIO_DIR):
-    os.makedirs(AUDIO_DIR)
-    st.info(f"'{AUDIO_DIR}' フォルダを作成しました。音声を配置してください。")
+if folder_name:
+    # JavaScriptのセキュリティ制限を回避するため、
+    # Python側で先に「正しいURLのパス」を計算して組み立てておきます
+    if "_" in folder_name:
+        file_name = folder_name.split("_")[-1]
+    else:
+        file_name = folder_name
+        
+    # 静的配信機能により、ブラウザからは "/static/..." でアクセス可能になります
+    audio_url = f"/static/{folder_name}/{file_name}.m4a"
 
-# 対応する拡張子
-SUPPORTED_EXTENSIONS = (".mp3", ".wav", ".m4a", ".ogg", ".flac")
+    # HTMLファイルを読み込む
+    with open("player.html", "r", encoding="utf-8") as f:
+        html_code = f.read()
 
-# フォルダ内の音声ファイル一覧を取得
-audio_files = [
-    f for f in os.listdir(AUDIO_DIR) 
-    if f.lower().endswith(SUPPORTED_EXTENSIONS)
-]
-
-if audio_files:
-    # ユーザーが再生するファイルを選択するセレクトボックス
-    selected_file = st.selectbox("再生する音声ファイルを選択してください", audio_files)
-    
-    # 選択されたファイルのフルパスを作成
-    file_path = os.path.join(AUDIO_DIR, selected_file)
-    
-    # ファイル名と拡張子を表示
-    st.write(f"選択中: `{selected_file}`")
-    
-    # 拡張子からマィムタイプ（MIME type）を自動判別するための準備
-    ext = os.path.splitext(selected_file)[1].lower()
-    mime_type = f"audio/{ext.replace('.', '')}"
-    # m4aの場合は audio/mp4 もしくは audio/x-m4a として扱うとブラウザ互換性が高まります
-    if ext == ".m4a":
-        mime_type = "audio/mp4"
-
-    # 音声プレイヤーの表示
-    st.audio(file_path, format=mime_type)
-
-else:
-    st.warning(f"'{AUDIO_DIR}' フォルダの中に音声ファイルが見つかりません。")
+    # --- 重要: HTMLにデータを渡す仕組み ---
+    # HTML内の専用スクリプト（Render用）へ、安全に音声URLを引き渡します
+    components.html(
+        html_code + f"""
+        <script>
+            // Streamlitからデータを受け取るための関数をセット
+            function onStreamlitMessage(event) {{
+                if (event.data.type === 'streamlit:render') {{
+                    // app.py から渡されたデータを直接受け取ることはできないため
+                    // 今回はURLをあらかじめ埋め込むか、以下の標準的な通信を行います
+                }}
+            }}
+            // シンプルに動かすため、HTML側の変数に直接URLを流し込みます
+            window.audioUrlFromPython = "{audio_url}";
+            if (typeof initPlayer === "function") {{
+                initPlayer();
+            }}
+        </script>
+        """,
+        height=200, # HTMLの大きさに合わせて調整してください
+    )
