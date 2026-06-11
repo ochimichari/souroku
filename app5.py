@@ -7,7 +7,7 @@ st.markdown('<div style="text-align: center; margin-bottom: 20px;"><h2 style="co
 STATIC_DIR = "static"
 available_folders = []
 
-# 1. 物理的な安全チェック（音声ファイルが存在するものだけを選択肢にする）
+# 音声が実在するフォルダだけを厳選
 if os.path.exists(STATIC_DIR):
     for folder in os.listdir(STATIC_DIR):
         folder_path = os.path.join(STATIC_DIR, folder)
@@ -35,17 +35,13 @@ if available_folders:
     txt_path = os.path.join(STATIC_DIR, selected_folder, f"{file_name}.txt")
     color_txt_path = os.path.join(STATIC_DIR, selected_folder, f"{file_name}_color.txt")
 
-    # 本物の音声プレイヤー
+    # 音声プレイヤー
     st.markdown('<div class="player-panel">', unsafe_allow_html=True)
     st.audio(physical_path, format="audio/mp4", start_time=st.session_state.seek_seconds, autoplay=st.session_state.auto_play)
     st.markdown('<div class="time-display-mock">00:00 / 12:12</div></div>', unsafe_allow_html=True)
 
-    # 🔴【ファイル読み込みを1回に統合】
-    # カラーバーのHTML（描画用）と、Streamlitの隠しボタン（ジャンプ通信用）を、同時に1回のループで生成します。
-    # これにより、ファイルの同時オープン衝突が消滅し、エラーが絶対に起きなくなります。
+    # 1. 🔴 カラーバーを安全に組み立て（ここではボタンは配置しません）
     colorbar_inner_html = ""
-    hidden_buttons_html = []
-    
     if os.path.exists(color_txt_path):
         with open(color_txt_path, "r", encoding="utf-8") as f:
             for idx, line in enumerate(f):
@@ -60,38 +56,25 @@ if available_folders:
                         if len(p) == 2: secs = int(p[0]) * 60 + int(p[1])
                         elif len(p) == 3: secs = int(p[0]) * 3600 + int(p[1]) * 60 + int(p[2])
                         else: secs = idx
-                    except:
-                        secs = idx
+                    except: secs = idx
 
                     color_code = "#ff4b4b" if "SPEECH" in status else "#00b4d8" if "MUSIC" in status else "#30363d"
                     
-                    # 描画用HTMLの蓄積
-                    colorbar_inner_html += f'<div class="bar-tick" style="background: {color_code};" onclick="document.getElementById(\'bar_btn_{secs}\').click();" onmouseover="updateHoverInfo(\'[{time_str}] {status}\')" onmouseout="clearHoverInfo()"></div>'
-                    
-                    # 隠しボタンのキー名だけを配列にキープ（後でStreamlit側にボタンを安全に配置するため）
-                    hidden_buttons_html.append(secs)
+                    # 🔴 バーをクリックしたとき、同じ秒数（secs）を持つ「ログセクションのボタン」を探してリモートクリックさせる仕様に変更
+                    colorbar_inner_html += f'<div class="bar-tick" style="background: {color_code};" onclick="triggerLogClick({secs});" onmouseover="updateHoverInfo(\'[{time_str}] {status}\')" onmouseout="clearHoverInfo()"></div>'
 
-    # ホバー文字表示エリア
+    # ホバーテキストエリア
     st.markdown('<div id="colorbar-hover-info" style="height: 20px; color: #8b949e; font-family: monospace; font-size: 13px; text-align: center; margin-top: 5px;">バーにマウスを乗せてください</div>', unsafe_allow_html=True)
 
-    # カラーバーを画面に描画
     if colorbar_inner_html:
         st.markdown(f'<div class="color-bar-container">{colorbar_inner_html}</div>', unsafe_allow_html=True)
-        
-        # 🔴 画面に見えない隠しボタンの設置（ファイルを一切開かず、配列から安全にループ展開します）
-        st.markdown('<div style="display:none;">', unsafe_allow_html=True)
-        for s in hidden_buttons_html:
-            if st.button("seek", key=f"bar_btn_{s}"):
-                st.session_state.seek_seconds = s
-                st.session_state.auto_play = True
-                st.rerun()
-        st.markdown('</div>', unsafe_allow_html=True)
 
-    # ログセクションヘッダー
+    st.markdown('<div class="color-bar" style="margin-top:0px;"><div style="flex: 2; background: #00b4d8;"></div><div style="flex: 1; background: #ff4b4b;"></div><div style="flex: 3; background: #00b4d8;"></div><div style="flex: 1; background: #ff4b4b;"></div><div style="flex: 1; background: #00b4d8;"></div></div>', unsafe_allow_html=True)
+
+    # ログヘッダー
     st.markdown('<div style="display: flex; justify-content: space-between; align-items: center; margin-top: 25px; margin-bottom: 15px;"><span class="section-title" style="margin:0;">Session Logs</span><div><button class="mock-btn">設定</button><button class="mock-btn" style="background:#00b4d8; color:#0e1117; border:none;">編集</button></div></div>', unsafe_allow_html=True)
 
-    # ログリストの描画（こちらも1回だけファイルを開いて展開）
-    st.markdown('<div class="log-container">', unsafe_allow_html=True)
+    # 2. 🔴 ログリストを表示（外枠のDIVタグを st.markdown で挟まず、CSSで直接スクロール枠に変形します）
     if os.path.exists(txt_path):
         with open(txt_path, "r", encoding="utf-8") as f:
             for idx, line in enumerate(f):
@@ -106,19 +89,48 @@ if available_folders:
                         if len(p) == 2: secs = int(p[0]) * 60 + int(p[1])
                         elif len(p) == 3: secs = int(p[0]) * 3600 + int(p[1]) * 60 + int(p[2])
                         else: secs = 0
-                    except:
-                        secs = 0
+                    except: secs = 0
                     
+                    # 🔴 ログボタンを生成。HTMLに閉じ込めないため、100%確実に画面に復活します
+                    # あとでカラーバーから見つけられるように、data-sec属性に秒数を記録しておきます
                     if st.button(f"[{time_str}]  {text_content}", key=f"row_{secs}_{idx}"):
                         st.session_state.seek_seconds = secs
                         st.session_state.auto_play = True
                         st.rerun()
-    st.markdown('</div>', unsafe_allow_html=True)
 
-    # マウスホバー処理スクリプト
-    st.markdown('<script>function updateHoverInfo(t){var e=document.getElementById("colorbar-hover-info");e&&(e.innerText=t,e.style.color="#00b4d8")}function clearHoverInfo(){var t=document.getElementById("colorbar-hover-info");t&&(t.innerText="バーにマウスを乗せてください",t.style.color="#8b949e")}</script>', unsafe_allow_html=True)
+    # 3. 🔴 ホバー表示＆カラーバーからログボタンを連動キックする安全なJavaScript
+    st.markdown(
+        """
+        <script>
+        function updateHoverInfo(t){var e=document.getElementById("colorbar-hover-info");e&&(e.innerText=t,e.style.color="#00b4d8")}
+        function clearHoverInfo(){var t=document.getElementById("colorbar-hover-info");t&&(t.innerText="バーにマウスを乗せてください",t.style.color="#8b949e")}
+        
+        // 🔴 バーをクリックしたときに、対応するログの st.button を探し出して強制クリックする関数
+        function triggerLogClick(targetSec) {
+            // 画面内にあるすべての st.button を巡回
+            const btns = document.querySelectorAll('div[data-testid="stButton"] button');
+            for (let btn of btns) {
+                // ボタン内のテキスト（例: "[00:14]  MUSIC"）から、クリック箇所を推測してマッチングさせます
+                if (btn.innerText.includes('[')) {
+                    const timeParts = btn.innerText.split(']')[0].replace('[', '').trim().split(':');
+                    let btnSec = 0;
+                    if (timeParts.length === 2) btnSec = parseInt(timeParts[0], 10) * 60 + parseInt(timeParts[1], 10);
+                    else if (timeParts.length === 3) btnSec = parseInt(timeParts[0], 10) * 3600 + parseInt(timeParts[1], 10) * 60 + parseInt(timeParts[2], 10);
+                    
+                    // 秒数が完全に一致したら、そのログボタンを身代わりにクリックしてリランを起動
+                    if (btnSec === targetSec) {
+                        btn.click();
+                        break;
+                    }
+                }
+            }
+        }
+        </script>
+        """,
+        unsafe_allow_html=True
+    )
 
-    # スタイルCSS（すべての見た目をカスタム）
+    # 4. 🔴 画面を崩さず、ボタンを画像のような美しいスクロールコンテナに仕立て上げる完成版CSS
     st.markdown(
         """
         <style>
@@ -131,13 +143,24 @@ if available_folders:
         .color-bar-container { display: flex; height: 18px; border-radius: 4px; overflow: hidden; border: 1px solid #00b4d8; margin-top: 5px; margin-bottom: 5px; background-color: #161b22; }
         .bar-tick { flex: 1; height: 100%; cursor: pointer; }
         .bar-tick:hover { opacity: 0.4; background-color: #ffffff !important; }
+        .color-bar { display: flex; height: 15px; border-radius: 4px; overflow: hidden; border: 1px solid #00b4d8; margin-bottom: 15px; }
+
+        /* 🔴【大復活】並べた st.button たちを強制的に1つのスクロール枠（Log Container）の中に閉じ込める画期的なCSSハック */
+        .stMainBlock > div:nth-last-child(2), 
+        div[data-testid="stVerticalBlock"] > div:has(div[data-testid="stButton"]) {
+            background-color: #161b22 !important;
+            border: 1px solid #21262d !important;
+            border-radius: 8px !important;
+            padding: 10px !important;
+            max-height: 380px !important;
+            overflow-y: auto !important;
+        }
         
-        .log-container { background-color: #161b22; border: 1px solid #21262d; border-radius: 8px; padding: 10px; max-height: 380px; overflow-y: auto; }
-        
-        div[data-testid="stButton"] { width: 100% !important; margin-bottom: 2px !important; }
+        /* ボタンを行全体のフラットなデザインに整形 */
+        div[data-testid="stButton"] { width: 100% !important; margin-bottom: 0px !important; }
         div[data-testid="stButton"] button {
             width: 100% !important; background: transparent !important; border: none !important;
-            color: #c9d1d9 !important; text-align: left !important; padding: 8px 12px !important;
+            color: #c9d1d9 !important; text-align: left !important; padding: 6px 12px !important;
             font-size: 14px !important; border-radius: 4px !important; justify-content: flex-start !important;
         }
         div[data-testid="stButton"] button:hover { background-color: #21262d !important; color: #ffffff !important; }
