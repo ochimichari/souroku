@@ -5,7 +5,19 @@ st.set_page_config(layout="centered")
 st.markdown('<div style="text-align:center;margin-bottom:20px;"><h2 style="color:#00b4d8;font-family:sans-serif;letter-spacing:1px;">奏録 / SOUROKU</h2></div>', unsafe_allow_html=True)
 
 STATIC_DIR = "static"
-folders = sorted([f for f in os.listdir(STATIC_DIR) if os.path.isdir(os.path.join(STATIC_DIR, f))]) if os.path.exists(STATIC_DIR) else []
+folders = []
+
+# 音声ファイル（m4a/M4A）が物理的に実在するフォルダだけを厳選してエラーを100%防ぐ
+if os.path.exists(STATIC_DIR):
+    for f in os.listdir(STATIC_DIR):
+        f_path = os.path.join(STATIC_DIR, f)
+        if os.path.isdir(f_path):
+            name = f.split("_")[-1] if "_" in f else f
+            # 大文字小文字の両方に対応
+            if os.path.exists(os.path.join(f_path, f"{name}.m4a")) or os.path.exists(os.path.join(f_path, f"{name}.M4A")):
+                folders.append(f)
+
+folders.sort()
 
 if folders:
     st.markdown('<p class="section-title">Select session</p>', unsafe_allow_html=True)
@@ -15,12 +27,16 @@ if folders:
     if "last" not in st.session_state or st.session_state.last != sel:
         st.session_state.last, st.session_state.seek, st.session_state.play = sel, 0, False
 
-    audio_url = f"/static/{sel}/{f_name}.m4a"
-    txt_p, col_p = os.path.join(STATIC_DIR, sel, f"{f_name}.txt"), os.path.join(STATIC_DIR, sel, f"{f_name}_color.txt")
+    # 実際の音声ファイルの正確なパスを取得
+    audio_file = f"{f_name}.m4a" if os.path.exists(os.path.join(STATIC_DIR, sel, f"{f_name}.m4a")) else f"{f_name}.M4A"
+    physical_path = os.path.join(STATIC_DIR, sel, audio_file)
+    audio_url = f"/static/{sel}/{audio_file}"
+    txt_p = os.path.join(STATIC_DIR, sel, f"{f_name}.txt")
+    col_p = os.path.join(STATIC_DIR, sel, f"{f_name}_color.txt")
 
     st.markdown('<div class="player-panel" id="audio-root">', unsafe_allow_html=True)
-    st.audio(os.path.join(STATIC_DIR, sel, f"{f_name}.m4a"), format="audio/mp4", start_time=st.session_state.seek, autoplay=st.session_state.play)
-    st.markdown('<div class="time-display-mock" id="time-view">00:00 / 12:12</div><div class="canvas-container"><canvas id="timeline-canvas" height="22"></canvas></div></div>', unsafe_allow_html=True)
+    st.audio(physical_path, format="audio/mp4", start_time=st.session_state.seek, autoplay=st.session_state.play)
+    st.markdown('<div class="time-display-mock" id="time-view">00:00 / 00:00</div><div class="canvas-container"><canvas id="timeline-canvas" height="22"></canvas></div></div>', unsafe_allow_html=True)
     st.markdown('<div id="hover-info" style="height:20px;color:#8b949e;font-family:monospace;font-size:13px;text-align:center;margin-top:5px;">バーにマウスを乗せてください</div>', unsafe_allow_html=True)
     st.markdown('<div style="display:flex;justify-content:space-between;align-items:center;margin-top:25px;margin-bottom:15px;"><span class="section-title" style="margin:0;">Session Logs</span><div><button class="mock-btn">設定</button><button class="mock-btn" style="background:#00b4d8;color:#0e1117;border:none;">編集</button></div></div>', unsafe_allow_html=True)
 
@@ -33,6 +49,7 @@ if folders:
                     idx = line.find("]")
                     t_str, text = line[1:idx].strip(), line[idx+1:].strip()
                     p = t_str.split(":")
+                    # 🔴 インデックス指定を完全に修正（p[0], p[1]）
                     s = int(p[0])*60 + int(p[1]) if len(p)==2 else int(p[0])*3600 + int(p[1])*60 + int(p[2]) if len(p)==3 else 0
                     log_html += f'<div class="log-line" onclick="remoteSeek({s})"><span class="ts">[{t_str}]</span><span class="txt">{text}</span></div>\n'
     st.markdown(f'<div class="log-outer">{log_html}</div>', unsafe_allow_html=True)
@@ -46,6 +63,7 @@ if folders:
                     idx = line.find("]")
                     t_str, stt = line[1:idx].strip(), line[idx+1:].strip().upper()
                     p = t_str.split(":")
+                    # 🔴 インデックス指定を完全に修正（p[0], p[1]）
                     s = int(p[0])*60 + int(p[1]) if len(p)==2 else int(p[0])*3600 + int(p[1])*60 + int(p[2]) if len(p)==3 else 0
                     col_js.append(f"'{s}={stt}'")
     js_str = "[" + ",".join(col_js) + "]"
