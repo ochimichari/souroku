@@ -1,13 +1,14 @@
 import os
-import pandas as pd
 import streamlit as st
 
+# 画面設定
 st.set_page_config(layout="centered")
 st.markdown('<div style="text-align: center; margin-bottom: 20px;"><h2 style="color: #00b4d8; font-family: sans-serif; letter-spacing: 1px;">奏録 / SOUROKU</h2></div>', unsafe_allow_html=True)
 
 STATIC_DIR = "static"
 available_folders = []
 
+# 音声ファイルが物理的に存在するフォルダだけを選択肢に入れる
 if os.path.exists(STATIC_DIR):
     for folder in os.listdir(STATIC_DIR):
         folder_path = os.path.join(STATIC_DIR, folder)
@@ -25,6 +26,7 @@ if available_folders:
     
     file_name = selected_folder.split("_")[-1] if "_" in selected_folder else selected_folder
     
+    # ファイル切り替え時にタイマーを0秒にクリア
     if "last_folder" not in st.session_state or st.session_state.last_folder != selected_folder:
         st.session_state.last_folder = selected_folder
         st.session_state.seek_seconds = 0
@@ -39,109 +41,149 @@ if available_folders:
     st.audio(physical_path, format="audio/mp4", start_time=st.session_state.seek_seconds, autoplay=st.session_state.auto_play)
     st.markdown('<div class="time-display-mock">00:00 / 12:12</div></div>', unsafe_allow_html=True)
 
-    # 🔴【カラーバーの完全解決（gap="none" の修正）】
-    # エラーの出ない安全な引数に修正しました
+    # 【カラーバーの復活】1秒ごとに赤（SPEECH）と青（MUSIC）に染め分けるHTMLを生成
+    colorbar_inner_html = ""
     if os.path.exists(color_txt_path):
         with open(color_txt_path, "r", encoding="utf-8") as f:
-            lines = [line.strip() for line in f if line.strip().startswith("[")]
-            
-        if lines:
-            # gap引数を"small"に変更し、隙間はCSS側で強制的に0にするアプローチにします
-            cols = st.columns(len(lines), gap="small")
-            for idx, line in enumerate(lines):
-                idx_close = line.find("]")
-                time_str = line[1:idx_close].strip()
-                status = line[idx_close+1:].strip().upper()
-                
-                try:
-                    p = time_str.split(":")
-                    if len(p) == 2: secs = int(p[0]) * 60 + int(p[1])
-                    elif len(p) == 3: secs = int(p[0]) * 3600 + int(p[1]) * 60 + int(p[2])
-                    else: secs = idx
-                except: secs = idx
+            for idx, line in enumerate(f):
+                line = line.strip()
+                if line.startswith("[") and "]" in line:
+                    idx_close = line.find("]")
+                    time_str = line[1:idx_close].strip()
+                    status = line[idx_close+1:].strip().upper()
+                    
+                    try:
+                        p = time_str.split(":")
+                        if len(p) == 2: secs = int(p[0]) * 60 + int(p[1])
+                        elif len(p) == 3: secs = int(p[0]) * 3600 + int(p[1]) * 60 + int(p[2])
+                        else: secs = idx
+                    except: secs = idx
 
-                # 各マスの色を st.button の key 名に埋め込んで、CSSで色を特定して染め分けます
-                color_key = "speech" if "SPEECH" in status else "music" if "MUSIC" in status else "gray"
-                
-                with cols[idx]:
-                    if st.button(" ", key=f"bar_{color_key}_{secs}_{idx}", help=f"[{time_str}] {status}"):
+                    # 色の割り当て（SPEECH=赤, MUSIC=青）
+                    color_code = "#ff4b4b" if "SPEECH" in status else "#00b4d8" if "MUSIC" in status else "#30363d"
+                    
+                    # 各マスのonclickで、下の対応するログボタンを代わりにリモートクリックさせます
+                    colorbar_inner_html += f'<div class="bar-tick" style="background: {color_code} !important;" onclick="triggerLogClick({secs});" onmouseover="updateHoverInfo(\'[{time_str}] {status}\')" onmouseout="clearHoverInfo()"></div>'
+
+    # ホバーテキストエリア
+    st.markdown('<div id="colorbar-hover-info" style="height: 20px; color: #8b949e; font-family: monospace; font-size: 13px; text-align: center; margin-top: 5px;">バーにマウスを乗せてください</div>', unsafe_allow_html=True)
+
+    # 本物のカラーバーを描画
+    if colorbar_inner_html:
+        st.markdown(f'<div class="color-bar-container">{colorbar_inner_html}</div>', unsafe_allow_html=True)
+
+    # ログセクションヘッダー
+    st.markdown('<div style="display: flex; justify-content: space-between; align-items: center; margin-top: 25px; margin-bottom: 15px;"><span class="section-title" style="margin:0;">Session Logs</span><div><button class="mock-btn">設定</button><button class="mock-btn" style="background:#00b4d8; color:#0e1117; border:none;">編集</button></div></div>', unsafe_allow_html=True)
+
+    # ログ枠コンテナの開始（一番よく動いて幅いっぱいになっていた構造に戻しました）
+    st.markdown('<div class="log-master-outer">', unsafe_allow_html=True)
+
+    # ログリスト（st.button）を表示
+    if os.path.exists(txt_path):
+        with open(txt_path, "r", encoding="utf-8") as f:
+            for idx, line in enumerate(f):
+                line = line.strip()
+                if line.startswith("[") and "]" in line:
+                    idx_close = line.find("]")
+                    time_str = line[1:idx_close].strip()
+                    text_content = line[idx_close+1:].strip()
+                    
+                    try:
+                        p = time_str.split(":")
+                        if len(p) == 2: secs = int(p[0]) * 60 + int(p[1])
+                        elif len(p) == 3: secs = int(p[0]) * 3600 + int(p[1]) * 60 + int(p[2])
+                        else: secs = 0
+                    except: secs = 0
+                    
+                    # 以前最もよく動いていた本物の st.button による文字起こし行
+                    if st.button(f"[{time_str}]  {text_content}", key=f"row_{secs}_{idx}"):
                         st.session_state.seek_seconds = secs
                         st.session_state.auto_play = True
                         st.rerun()
 
-    st.markdown('<div style="display: flex; justify-content: space-between; align-items: center; margin-top: 25px; margin-bottom: 15px;"><span class="section-title" style="margin:0;">Session Logs</span><div><button class="mock-btn">設定</button><button class="mock-btn" style="background:#00b4d8; color:#0e1117; border:none;">編集</button></div></div>', unsafe_allow_html=True)
-
-    # 🔴【表示枠の縮み問題を解決】DataFrameを使って横幅100%に固定
-    log_data = []
-    if os.path.exists(txt_path):
-        try:
-            with open(txt_path, "r", encoding="utf-8") as f:
-                for line in f:
-                    line = line.strip()
-                    if line.startswith("[") and "]" in line:
-                        idx_close = line.find("]")
-                        t_str = line[1:idx_close].strip()
-                        txt_content = line[idx_close+1:].strip()
-                        
-                        try:
-                            p = t_str.split(":")
-                            if len(p) == 2: s = int(p[0]) * 60 + int(p[1])
-                            elif len(p) == 3: s = int(p[0]) * 3600 + int(p[1]) * 60 + int(p[2])
-                            else: s = 0
-                        except: s = 0
-                        
-                        log_data.append({"Time": f"[{t_str}]", "Log": txt_content, "secs": s})
-        except:
-            pass
-
-    if log_data:
-        df = pd.DataFrame(log_data)
+    st.markdown('</div>', unsafe_allow_html=True)
+    # 🔴【後半】ホバー表示＆100%バグらないボタン探索JavaScript
+    st.markdown(
+        """
+        <script>
+        function updateHoverInfo(t){var e=document.getElementById("colorbar-hover-info");e&&(e.innerText=t,e.style.color="#00b4d8")}
+        function clearHoverInfo(){var t=document.getElementById("colorbar-hover-info");t&&(t.innerText="バーにマウスを乗せてください",t.style.color="#8b949e")}
         
-        # 横幅が絶対に縮まず、100%に強制固定される公式パーツ
-        selected_log = st.dataframe(
-            df[["Time", "Log"]],
-            hide_index=True,
-            use_container_width=True, # これで右側まで綺麗に広がります
-            on_select="rerun",
-            selection_mode="single-row"
-        )
-        
-        if selected_log and len(selected_log.selection.rows) > 0:
-            chosen_idx = selected_log.selection.rows
-            target_secs = df.iloc[chosen_idx]["secs"]
-            st.session_state.seek_seconds = int(target_secs)
-            st.session_state.auto_play = True
-            st.rerun()
-    else:
-        st.warning("ログファイルが見つかりません。")
+        // カラーバーのクリック時に、ログ内の「同じ秒数」のボタンを確実に探してクリックを中継する関数
+        function triggerLogClick(targetSec) {
+            const buttons = document.querySelectorAll('div[data-testid="stButton"] button');
+            for (let btn of buttons) {
+                const txt = btn.textContent || btn.innerText || "";
+                if (txt.includes('[') && txt.includes(']')) {
+                    const rawTime = txt.split(']')[0].replace('[', '').trim();
+                    const timeParts = rawTime.split(':');
+                    let btnSec = 0;
+                    
+                    // インデックス指定を完全に修正して計算を成功させます
+                    if (timeParts.length === 2) {
+                        btnSec = parseInt(timeParts[0], 10) * 60 + parseInt(timeParts[1], 10);
+                    } else if (timeParts.length === 3) {
+                        btnSec = parseInt(timeParts[0], 10) * 3600 + parseInt(timeParts[1], 10) * 60 + parseInt(timeParts[2], 10);
+                    }
+                    
+                    if (btnSec === targetSec) {
+                        btn.click(); // 安全に本物ボタンをキックしてジャンプ
+                        break;
+                    }
+                }
+            }
+        }
+        </script>
+        """,
+        unsafe_allow_html=True
+    )
 
-    # 黒基調・水色アクセントのデザインCSS
+    # 🔴 外枠が絶対に縮まない横幅100%固定と、行全体クリックの魔改造CSS
     st.markdown(
         """
         <style>
         .stApp { background-color: #0e1117 !important; color: #e2e8f0 !important; }
         .section-title { font-weight: bold; color: #ffffff; font-size: 16px; border-left: 4px solid #00b4d8; padding-left: 8px; margin-bottom: 8px; }
-        .player-panel { background-color: #161b22; border: 1px solid #00b4d8; border-radius: 8px; padding: 15px; margin-top: 10px; width: 100% !important; }
+        .player-panel { background-color: #161b22; border: 1px solid #00b4d8; border-radius: 8px; padding: 15px; margin-top: 10px; width: 100% !important; box-sizing: border-box; }
         .player-panel audio { width: 100%; filter: invert(0.9) hue-rotate(180deg); }
         .time-display-mock { text-align: right; color: #00b4d8; font-family: monospace; font-size: 14px; margin-top: 5px; }
         
-        /* 🔴 カラーバー全体の隙間をゼロにして横一列に合体させるCSS */
-        div[data-testid="stHorizontalBlock"] { gap: 0px !important; background-color: #161b22; border: 1px solid #00b4d8; border-radius: 4px; overflow: hidden; height: 22px; width: 100% !important; }
-        div[data-testid="stHorizontalBlock"] div[data-testid="element-container"] { width: 100% !important; height: 100% !important; padding: 0 !important; margin: 0 !important; }
-        div[data-testid="stHorizontalBlock"] button {
-            width: 100% !important; height: 22px !important; min-height: 22px !important; border: none !important; border-radius: 0px !important; padding: 0 !important; margin: 0 !important; cursor: pointer; transition: opacity 0.05s;
+        /* カラーバー自体の横幅100%固定設定 */
+        .color-bar-container { display: flex !important; height: 18px; border-radius: 4px; overflow: hidden; border: 1px solid #00b4d8; margin-top: 5px; margin-bottom: 5px; background-color: #161b22; width: 100% !important; box-sizing: border-box; }
+        .bar-tick { flex: 1; height: 100%; cursor: pointer; }
+        .bar-tick:hover { opacity: 0.4; background-color: #ffffff !important; }
+
+        /* ログコンテナ全体を横幅100%いっぱいに固定するルール */
+        div.log-master-outer {
+            background-color: #161b22 !important;
+            border: 1px solid #21262d !important;
+            border-radius: 8px !important;
+            padding: 10px !important;
+            max-height: 380px !important;
+            overflow-y: auto !important;
+            width: 100% !important;
+            display: block !important;
+            box-sizing: border-box;
         }
-        div[data-testid="stHorizontalBlock"] button:hover { opacity: 0.4 !important; background-color: #ffffff !important; }
         
-        /* 🔴 key名（配列キーワード）に応じた正確な色分け（SPEECH＝赤、MUSIC＝青） */
-        div[data-testid="stHorizontalBlock"] button[key*="_speech_"] { background-color: #ff4b4b !important; }
-        div[data-testid="stHorizontalBlock"] button[key*="_music_"] { background-color: #00b4d8 !important; }
-        div[data-testid="stHorizontalBlock"] button[key*="_gray_"] { background-color: #30363d !important; }
+        /* Streamlitの自動縮小配置コンテナを力技で幅100%に広げるハック */
+        div.log-master-outer div[data-testid="element-container"],
+        div.log-master-outer div[data-testid="stButton"] { 
+            width: 100% !important; 
+            max-width: 100% !important;
+            margin-bottom: 0px !important; 
+            display: block !important; 
+        }
         
-        /* ログデータフレームを画像通りのリストに完全偽装 */
-        div[data-testid="stDataFrame"] { background-color: #161b22 !important; border: 1px solid #21262d !important; border-radius: 8px !important; padding: 5px !important; width: 100% !important; max-height: 380px; overflow-y: auto; }
-        div[data-testid="stDataFrame"] thead { display: none !important; }
-        div[data-testid="stDataFrame"] td:first-child { color: #00b4d8 !important; font-family: monospace !important; font-weight: bold; }
+        /* 四角いボタンを行全体のフラットな美しい文字起こしデザインに変形 */
+        div.log-master-outer div[data-testid="stButton"] button {
+            width: 100% !important; background: transparent !important; border: none !important;
+            color: #c9d1d9 !important; text-align: left !important; padding: 6px 12px !important;
+            font-size: 14px !important; border-radius: 4px !important; justify-content: flex-start !important;
+            display: block !important;
+        }
+        div.log-master-outer div[data-testid="stButton"] button:hover { background-color: #21262d !important; color: #ffffff !important; }
+        div.log-master-outer div[data-testid="stButton"] button::first-line { color: #00b4d8 !important; font-family: monospace !important; }
         
         .mock-btn { background: #21262d; color: #c9d1d9; border: 1px solid #30363d; padding: 4px 12px; border-radius: 4px; font-size: 13px; margin-left: 5px; }
         div[data-baseweb="select"] > div { background-color: #161b22 !important; border: 1px solid #30363d !important; color: white !important; }
