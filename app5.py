@@ -1,7 +1,7 @@
 import os
 import streamlit as st
 
-# ページ設定
+# 1. ページ全体をダークモード風の背景色に固定
 st.set_page_config(layout="centered")
 
 st.markdown(
@@ -45,9 +45,17 @@ if available_folders:
     else:
         selected_file_name = selected_folder
         
-    # 🔴 クラウザ上で100%読み込み拒否されない、正しい静的ルート相対URLパス
-    audio_url = f"/static/{selected_folder}/{selected_file_name}.m4a"
+    physical_path = os.path.join(STATIC_DIR, selected_folder, f"{selected_file_name}.m4a")
     text_physical_path = os.path.join(STATIC_DIR, selected_folder, f"{selected_file_name}.txt")
+
+    # 🔴【ジャンプの仕組み】クリックされた秒数を記憶するセッション状態（State）を作成
+    if "seek_seconds" not in st.session_state:
+        st.session_state.seek_seconds = 0
+
+    # 🔴 確実に音が鳴る公式プレイヤーに、記憶した秒数（start_time）を流し込みます
+    st.markdown('<div class="player-panel">', unsafe_allow_html=True)
+    st.audio(physical_path, format="audio/mp4", start_time=st.session_state.seek_seconds)
+    st.markdown('</div>', unsafe_allow_html=True)
 
     # カラフルなインジケーター（ダミー）
     st.markdown(
@@ -77,9 +85,9 @@ if available_folders:
         unsafe_allow_html=True
     )
 
-    # テキストファイル（.txt）を読み込んでHTMLを組み立てる処理
-    log_html_content = ""
-    
+    # ログコンテナの開始
+    st.markdown('<div class="log-container">', unsafe_allow_html=True)
+
     if os.path.exists(text_physical_path):
         try:
             with open(text_physical_path, "r", encoding="utf-8") as f:
@@ -95,7 +103,7 @@ if available_folders:
                     timestamp_str = parts[0].replace("[", "").strip() # 例: "00:25"
                     text = parts[1].strip()     
                     
-                    # 「分:秒」を秒数に変換
+                    # タイムスタンプを秒数に変換
                     try:
                         time_parts = timestamp_str.split(":")
                         if len(time_parts) == 2:
@@ -107,136 +115,57 @@ if available_folders:
                     except ValueError:
                         seconds = 0
                     
-                    log_html_content += (
-                        f'<div class="log-line">'
-                        f'<span class="timestamp-btn" onclick="seekToAudio({seconds})">[{timestamp_str}]</span>'
-                        f' {text}'
-                        f'</div>\n'
-                    )
+                    # 🔴【最大の変更点】JavaScriptのボタンではなく、Streamlit公式の st.button を配置
+                    # クリックされると、指定の秒数を保存してアプリ全体を安全に再起動（リラン）させます
+                    col1, col2 = st.columns([1, 5])
+                    with col1:
+                        if st.button(f"[{timestamp_str}]", key=f"btn_{seconds}_{line[:5]}"):
+                            st.session_state.seek_seconds = seconds
+                            st.rerun() # 画面を再描画して、プレイヤーの位置を動かす
+                    with col2:
+                        st.markdown(f'<div class="log-text">{text}</div>', unsafe_allow_html=True)
                 else:
-                    log_html_content += f'<div class="log-line">{line}</div>\n'
+                    st.markdown(f'<div class="log-line">{line}</div>', unsafe_allow_html=True)
         except Exception as e:
-            log_html_content = f'<div class="log-line" style="color: #ff4b4b;">ファイルの読み込みエラー</div>'
+            st.error("ファイルの読み込みエラーが発生しました。")
     else:
-        log_html_content = f'<div class="log-line" style="color: #8b949e; font-style: italic;">ログファイルが見つかりません</div>'
+        st.caption("ログファイルが見つかりません。")
 
-    # 🔴【最大の変更点】
-    # 隔離された st.audio を使わず、1つの大きなHTMLブロックの中に「プレイヤー」と「ログリスト」と「制御JavaScript」を完全に同居させます。
-    # これにより、同一空間内の通信となり、タイムスタンプクリックによるジャンプが100%阻害されずに動作します。
-    integrated_html = f"""
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <meta charset="UTF-8">
-        <style>
-            body {{ margin: 0; padding: 0; background-color: transparent; font-family: sans-serif; }}
-            
-            /* プレイヤー外枠パネルのデザイン（画像準拠） */
-            .player-panel {{
-                background-color: #161b22;
-                border: 1px solid #00b4d8;
-                border-radius: 8px;
-                padding: 15px;
-                margin-bottom: 20px;
-                box-sizing: border-box;
-            }}
-            .player-panel audio {{
-                width: 100%;
-                filter: invert(0.9) hue-rotate(180deg); /* プレイヤーのダーク水色化 */
-            }}
-            .time-display-mock {{
-                text-align: right;
-                color: #00b4d8;
-                font-family: monospace;
-                font-size: 14px;
-                margin-top: 5px;
-            }}
+    # ログコンテナの終了
+    st.markdown('</div>', unsafe_allow_html=True)
 
-            /* ログコンテナのデザイン */
-            .log-container {{
-                background-color: #161b22;
-                border: 1px solid #21262d;
-                border-radius: 8px;
-                padding: 15px;
-                max-height: 400px;
-                overflow-y: auto;
-                box-sizing: border-box;
-            }}
-            .log-line {{
-                font-size: 14px;
-                color: #c9d1d9;
-                margin-bottom: 16px;
-                line-height: 1.5;
-            }}
-            .timestamp-btn {{
-                color: #00b4d8;
-                font-family: monospace;
-                margin-right: 8px;
-                cursor: pointer;
-                user-select: none;
-                display: inline-block;
-            }}
-            .timestamp-btn:hover {{
-                text-decoration: underline;
-                color: #33c2df;
-            }}
-        </style>
-    </head>
-    <body>
-
-        <!-- 同一のHTML内にプレイヤーを配置（/static/ からストリーミングされるため大容量でもパンクしません） -->
-        <div class="player-panel">
-            <audio id="custom-internal-audio" controls src="{audio_url}"></audio>
-            <div class="time-display-mock" id="internal-time-display">00:00 / 00:00</div>
-        </div>
-
-        <!-- ログリスト -->
-        <div class="log-container">
-            {log_html_content}
-        </div>
-
-        <script>
-            const audioEl = document.getElementById('custom-internal-audio');
-            const timeDisplay = document.getElementById('internal-time-display');
-
-            // 秒数を 00:00 形式にする関数
-            function formatTime(seconds) {{
-                if (isNaN(seconds)) return "00:00";
-                const mins = Math.floor(seconds / 60);
-                const secs = Math.floor(seconds % 60);
-                return String(mins).padStart(2, '0') + ':' + String(secs).padStart(2, '0');
-            }}
-
-            // プレイヤー右下の時間カウントを本物のデータとリアルタイム連動させる
-            audioEl.addEventListener('loadedmetadata', () => {{
-                timeDisplay.innerText = formatTime(audioEl.currentTime) + " / " + formatTime(audioEl.duration);
-            }});
-            audioEl.addEventListener('timeupdate', () => {{
-                timeDisplay.innerText = formatTime(audioEl.currentTime) + " / " + formatTime(audioEl.duration);
-            }});
-
-            // 🔴 同じ部屋の中にあるので、このジャンプ処理が完全に成功します
-            function seekToAudio(seconds) {{
-                if (audioEl) {{
-                    audioEl.currentTime = seconds;
-                    audioEl.play().catch(e => console.log("再生開始がブロックされました", e));
-                }}
-            }}
-        </script>
-    </body>
-    </html>
-    """
-
-    # Streamlitのコンポーネントとして一体化HTMLを流し込む（高さを十分に確保）
-    import streamlit.components.v1 as components
-    components.html(integrated_html, height=600)
-
-    # 画面背景などのスタイル補正
+    # 🔴 画像の「黒基調・水色アクセント」を再現するCSS
     st.markdown(
         """
         <style>
         .stApp { background-color: #0e1117 !important; color: #e2e8f0 !important; }
         .section-title { font-weight: bold; color: #ffffff; font-size: 16px; border-left: 4px solid #00b4d8; padding-left: 8px; margin-top: 15px; margin-bottom: 8px; }
+        
+        /* プレイヤーを囲む黒いパネル枠（水色の境界線） */
+        .player-panel { background-color: #161b22; border: 1px solid #00b4d8; border-radius: 8px; padding: 15px; margin-top: 10px; }
+        .player-panel audio { width: 100%; filter: invert(0.9) hue-rotate(180deg); }
+        
+        .color-bar { display: flex; height: 15px; border-radius: 4px; overflow: hidden; margin-top: 10px; border: 1px solid #00b4d8; }
+        
+        /* ログコンテナ枠（スクロール可能にする） */
+        .log-container { background-color: #161b22; border: 1px solid #21262d; border-radius: 8px; padding: 15px; max-height: 400px; overflow-y: auto; }
+        
+        /* 🔴 Streamlitのボタンを画像の水色リンク風に魔改造するCSS */
+        div[data-testid="stButton"] button {
+            background: transparent !important;
+            border: none !important;
+            color: #00b4d8 !important;
+            font-family: monospace !important;
+            padding: 0 !important;
+            font-size: 14px !important;
+            cursor: pointer !important;
+        }
+        div[data-testid="stButton"] button:hover {
+            text-decoration: underline !important;
+            color: #33c2df !important;
+        }
+        
+        .log-text { font-size: 14px; color: #c9d1d9; line-height: 2.2; font-family: sans-serif; }
         .mock-btn { background: #21262d; color: #c9d1d9; border: 1px solid #30363d; padding: 4px 12px; border-radius: 4px; font-size: 13px; margin-left: 5px; cursor: pointer; }
         div[data-baseweb="select"] > div { background-color: #161b22 !important; border: 1px solid #30363d !important; color: white !important; }
         </style>
