@@ -4,42 +4,44 @@ import streamlit.components.v1 as components
 
 st.title("🎵 カスタムHTMLプレイヤー")
 
-# テスト用の入力欄（例: "groupA" など）
-folder_name = st.text_input("フォルダ名を入力してください", value="groupA")
+# 1. 入力フォーム
+folder_name = st.text_input("フォルダ名を入力してください", value="20260607_airs")
 
-if folder_name:
-    # JavaScriptのセキュリティ制限を回避するため、
-    # Python側で先に「正しいURLのパス」を計算して組み立てておきます
-    if "_" in folder_name:
-        file_name = folder_name.split("_")[-1]
-    else:
-        file_name = folder_name
-        
-    # 静的配信機能により、ブラウザからは "/static/..." でアクセス可能になります
+# 入力があり、かつ「_」が含まれている場合のみ動かす
+if folder_name and "_" in folder_name:
+    
+    # ファイル名切り出しルール (20260607_airs -> airs)
+    file_name = folder_name.split("_")[-1]
+    
+    # ブラウザがアクセスする用のURLパス
     audio_url = f"/static/{folder_name}/{file_name}.m4a"
+    
+    # クラウドサーバー上の実際の物理パス（存在確認用）
+    # ※staticフォルダ内に音声がある前提です
+    physical_path = os.path.join("static", folder_name, f"{file_name}.m4a")
 
-    # HTMLファイルを読み込む
-    with open("player.html", "r", encoding="utf-8") as f:
-        html_code = f.read()
+    # サーバー上に本当にファイルがあるか確認
+    if os.path.exists(physical_path):
+        
+        # HTMLファイルを読み込む（player.htmlに変更）
+        with open("player.html", "r", encoding="utf-8") as f:
+            html_code = f.read()
 
-    # --- 重要: HTMLにデータを渡す仕組み ---
-    # HTML内の専用スクリプト（Render用）へ、安全に音声URLを引き渡します
-    components.html(
-        html_code + f"""
-        <script>
-            // Streamlitからデータを受け取るための関数をセット
-            function onStreamlitMessage(event) {{
-                if (event.data.type === 'streamlit:render') {{
-                    // app.py から渡されたデータを直接受け取ることはできないため
-                    // 今回はURLをあらかじめ埋め込むか、以下の標準的な通信を行います
+        # HTMLをブラウザにレンダリングし、同時にURLを安全に流し込む
+        components.html(
+            html_code + f"""
+            <script>
+                // 変数に安全に代入
+                window.audioUrlFromPython = "{audio_url}";
+                // プレイヤーの読み込み関数を実行
+                if (typeof initPlayer === "function") {{
+                    initPlayer();
                 }}
-            }}
-            // シンプルに動かすため、HTML側の変数に直接URLを流し込みます
-            window.audioUrlFromPython = "{audio_url}";
-            if (typeof initPlayer === "function") {{
-                initPlayer();
-            }}
-        </script>
-        """,
-        height=200, # HTMLの大きさに合わせて調整してください
-    )
+            </script>
+            """,
+            height=200,
+        )
+    else:
+        st.error(f"⚠️ サーバ上にファイルが見つかりません。配置を再確認してください:\n`{physical_path}`")
+else:
+    st.warning("有効なフォルダ名（例: 20260607_airs）を入力してください。")
