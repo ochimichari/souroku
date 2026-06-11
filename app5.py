@@ -2,61 +2,55 @@ import os
 import streamlit as st
 import streamlit.components.v1 as components
 
-st.title("🎵 カスタムHTMLプレイヤー (自動検索版)")
+st.title("🎵 カスタムHTMLプレイヤー (ストリーミング版)")
 
 STATIC_DIR = "static"
 
-# 1. static フォルダが存在しない場合は空のリストにする
-if not os.path.exists(STATIC_DIR):
-    os.makedirs(STATIC_DIR)
-    st.info(f"'{STATIC_DIR}' フォルダを作成しました。音声フォルダを配置してください。")
-
-# 2. static配下のフォルダを自動リサーチして、有効な音声フォルダの一覧を作る
+# リサーチ処理（ここは先ほどと同じです）
 available_folders = []
-
 if os.path.exists(STATIC_DIR):
     for folder in os.listdir(STATIC_DIR):
         folder_path = os.path.join(STATIC_DIR, folder)
-        
-        # ディレクトリ（フォルダ）である場合のみ処理
         if os.path.isdir(folder_path):
-            # フォルダ名からファイル名を計算 (例: 20260607_airs -> airs)
             if "_" in folder:
                 file_name = folder.split("_")[-1]
             else:
                 file_name = folder
-                
-            # 実際に m4a ファイルが存在するかチェック
             m4a_path = os.path.join(folder_path, f"{file_name}.m4a")
             if os.path.exists(m4a_path):
                 available_folders.append(folder)
 
-# 3. 画面に選択肢（セレクトボックス）を表示
 if available_folders:
-    # 昇順で並び替え（日付順などに見やすくするため）
     available_folders.sort()
+    selected_folder = st.selectbox("再生する音声を選択してください", options=available_folders)
     
-    selected_folder = st.selectbox(
-        "再生する音声を選択してください", 
-        options=available_folders
-    )
-    
-    # 4. 選択されたフォルダからURLを特定
     if "_" in selected_folder:
         selected_file_name = selected_folder.split("_")[-1]
     else:
         selected_file_name = selected_folder
         
-    audio_url = f"/static/{selected_folder}/{selected_file_name}.m4a"
+    # 実際の物理パス
+    physical_path = os.path.join(STATIC_DIR, selected_folder, f"{selected_file_name}.m4a")
     
-    # 画面に現在選択中の情報を表示
-    st.caption(f"再生中: {selected_folder}/{selected_file_name}.m4a")
+    # 🔴【重要】Streamlitの内部機能を使って、ブラウザからアクセス可能な「本物のURL」を逆引きします。
+    # これにより、Community Cloud上のセキュリティ制限をすり抜ける正しいURLが手に入ります。
+    try:
+        from streamlit.runtime.scriptrunner import get_script_run_ctx
+        # サーバが提供するこのファイル専用の内部配信用URLを取得
+        audio_url = st.runtime.exists() and st.runtime.get_instance().media_file_mgr.add(
+            physical_path, "audio/mp4", get_script_run_ctx().session_id
+        )
+    except Exception:
+        # ローカル環境などのフォールバック
+        audio_url = f"/static/{selected_folder}/{selected_file_name}.m4a"
 
-    # 5. player.html を読み込んで埋め込み
+    st.caption(f"ストリーミング再生中: {selected_folder}/{selected_file_name}.m4a")
+
     if os.path.exists("player.html"):
         with open("player.html", "r", encoding="utf-8") as f:
             html_code = f.read()
 
+        # 本物のURLをHTML側のプレイヤーに引き渡す
         components.html(
             html_code + f"""
             <script>
