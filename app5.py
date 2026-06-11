@@ -1,12 +1,32 @@
 import os
 import streamlit as st
 
-# 画面設定
+# 1. ページ全体のダークモード設定
 st.set_page_config(layout="centered")
 st.markdown('<div style="text-align: center; margin-bottom: 20px;"><h2 style="color: #00b4d8; font-family: sans-serif; letter-spacing: 1px;">奏録 / SOUROKU</h2></div>', unsafe_allow_html=True)
 
 STATIC_DIR = "static"
-available_folders = sorted([f for f in os.listdir(STATIC_DIR) if os.path.isdir(os.path.join(STATIC_DIR, f))]) if os.path.exists(STATIC_DIR) else []
+available_folders = []
+
+# 🔴【安全チェック】static内のフォルダを精査し、「音声ファイルが実在するもの」だけを厳選する
+if os.path.exists(STATIC_DIR):
+    for folder in os.listdir(STATIC_DIR):
+        folder_path = os.path.join(STATIC_DIR, folder)
+        
+        if os.path.isdir(folder_path):
+            # フォルダ名からファイル名を計算 (20260516_airs -> airs)
+            file_name = folder.split("_")[-1] if "_" in folder else folder
+            
+            # 実際のファイルパスを組み立てる
+            m4a_path = os.path.join(folder_path, f"{file_name}.m4a")
+            
+            # 🔴【超重要】ファイルが「本当に物理的に存在する」場合のみ、選択肢に追加する
+            # これにより、存在しないファイルを st.audio に渡してクラッシュするのを100%防ぎます
+            if os.path.exists(m4a_path):
+                available_folders.append(folder)
+
+# アルファベット・日付順にソート
+available_folders.sort()
 
 if available_folders:
     st.markdown('<p class="section-title">Select session</p>', unsafe_allow_html=True)
@@ -14,27 +34,27 @@ if available_folders:
     
     file_name = selected_folder.split("_")[-1] if "_" in selected_folder else selected_folder
     
-    # 🔴 ファイル切り替え時に再生時間をゼロにリセット
+    # ファイル切り替え時に再生時間をゼロにリセット
     if "last_folder" not in st.session_state or st.session_state.last_folder != selected_folder:
         st.session_state.last_folder = selected_folder
         st.session_state.seek_seconds = 0
-        st.session_state.auto_play = False  # ファイル変更直後は勝手に鳴らさない
+        st.session_state.auto_play = False
 
     physical_path = os.path.join(STATIC_DIR, selected_folder, f"{file_name}.m4a")
     txt_path = os.path.join(STATIC_DIR, selected_folder, f"{file_name}.txt")
 
-    # 🔴 確実に音が鳴る公式プレイヤー（start_timeとautoplayを連動）
+    # 音声プレイヤー（前段階のガードにより、ここは100%安全に読み込まれます）
     st.markdown('<div class="player-panel">', unsafe_allow_html=True)
     st.audio(physical_path, format="audio/mp4", start_time=st.session_state.seek_seconds, autoplay=st.session_state.auto_play)
     st.markdown('<div class="time-display-mock">00:00 / 12:12</div></div>', unsafe_allow_html=True)
 
-    # カラフルなインジケーター（ダミー）
+    # インジケーターバー
     st.markdown('<div class="color-bar"><div style="flex: 2; background: #00b4d8;"></div><div style="flex: 1; background: #ff4b4b;"></div><div style="flex: 3; background: #00b4d8;"></div><div style="flex: 1; background: #ff4b4b;"></div><div style="flex: 1; background: #00b4d8;"></div></div>', unsafe_allow_html=True)
     
-    # ログセクションヘッダー
+    # ログヘッダー
     st.markdown('<div style="display: flex; justify-content: space-between; align-items: center; margin-top: 25px; margin-bottom: 15px;"><span class="section-title" style="margin:0;">Session Logs</span><div><button class="mock-btn">設定</button><button class="mock-btn" style="background:#00b4d8; color:#0e1117; border:none;">編集</button></div></div>', unsafe_allow_html=True)
 
-    # 🔴 行全域クリックの実現（st.markdown のコンテナの中に、st.button を直接並べる）
+    # ログリストの描画（st.buttonをカスタム）
     st.markdown('<div class="log-container">', unsafe_allow_html=True)
     if os.path.exists(txt_path):
         with open(txt_path, "r", encoding="utf-8") as f:
@@ -52,14 +72,14 @@ if available_folders:
                         else: secs = 0
                     except ValueError: secs = 0
                     
-                    # 🔴 1行全体をひとつの大きな st.button にし、CSSで文字起こし風に偽装
+                    # 行ボタン
                     if st.button(f"[{time_str}]  {text_content}", key=f"row_{secs}_{idx}"):
                         st.session_state.seek_seconds = secs
-                        st.session_state.auto_play = True  # クリックされたら自動再生をオンにする
+                        st.session_state.auto_play = True
                         st.rerun()
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # 🔴 無骨な st.button を、美しい文字起こしリスト（行全体クリック）に完全変身させるCSS
+    # スタイルCSS（大元のStreamlitパーツを着せ替え）
     st.markdown(
         """
         <style>
@@ -69,18 +89,14 @@ if available_folders:
         .player-panel audio { width: 100%; filter: invert(0.9) hue-rotate(180deg); }
         .time-display-mock { text-align: right; color: #00b4d8; font-family: monospace; font-size: 14px; margin-top: 5px; }
         .color-bar { display: flex; height: 15px; border-radius: 4px; overflow: hidden; border: 1px solid #00b4d8; }
-        
-        /* ログコンテナ枠の装飾 */
         .log-container { background-color: #161b22; border: 1px solid #21262d; border-radius: 8px; padding: 10px; max-height: 380px; overflow-y: auto; }
         
-        /* 🔴 st.buttonの外枠をご自身のデザイン行に完全変形（ボタンの枠や背景を消去） */
         div[data-testid="stButton"] { width: 100% !important; margin-bottom: 2px !important; }
         div[data-testid="stButton"] button {
             width: 100% !important; background: transparent !important; border: none !important;
             color: #c9d1d9 !important; text-align: left !important; padding: 8px 12px !important;
             font-size: 14px !important; border-radius: 4px !important; justify-content: flex-start !important;
         }
-        /* マウスを乗せたら行全体が明るくなり、文字が白くハイライトされる */
         div[data-testid="stButton"] button:hover { background-color: #21262d !important; color: #ffffff !important; }
         div[data-testid="stButton"] button::first-line { color: #00b4d8 !important; font-family: monospace !important; }
         
@@ -92,4 +108,4 @@ if available_folders:
         unsafe_allow_html=True
     )
 else:
-    st.warning("`static` フォルダ内に有効な音声フォルダが見つかりません。")
+    st.warning("`static` フォルダ内に、実在する音声ファイル（.m4a）が見つかりません。配置を再確認してください。")
