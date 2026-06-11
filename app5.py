@@ -38,7 +38,7 @@ if available_folders:
     st.audio(physical_path, format="audio/mp4", start_time=st.session_state.seek_seconds, autoplay=st.session_state.auto_play)
     st.markdown('<div class="time-display-mock">00:00 / 12:12</div></div>', unsafe_allow_html=True)
 
-    # 1. 🔴 本物の動的カラーバーのみを生成
+    # カラーバーの生成
     colorbar_inner_html = ""
     if os.path.exists(color_txt_path):
         with open(color_txt_path, "r", encoding="utf-8") as f:
@@ -59,20 +59,17 @@ if available_folders:
                     color_code = "#ff4b4b" if "SPEECH" in status else "#00b4d8" if "MUSIC" in status else "#30363d"
                     colorbar_inner_html += f'<div class="bar-tick" style="background: {color_code};" onclick="triggerLogClick({secs});" onmouseover="updateHoverInfo(\'[{time_str}] {status}\')" onmouseout="clearHoverInfo()"></div>'
 
-    # ホバーテキスト
     st.markdown('<div id="colorbar-hover-info" style="height: 20px; color: #8b949e; font-family: monospace; font-size: 13px; text-align: center; margin-top: 5px;">バーにマウスを乗せてください</div>', unsafe_allow_html=True)
 
-    # 本物のカラーバーのみを描画（ダミーの2つ目は完全に削除しました）
     if colorbar_inner_html:
         st.markdown(f'<div class="color-bar-container">{colorbar_inner_html}</div>', unsafe_allow_html=True)
 
-    # ログヘッダー
     st.markdown('<div style="display: flex; justify-content: space-between; align-items: center; margin-top: 25px; margin-bottom: 15px;"><span class="section-title" style="margin:0;">Session Logs</span><div><button class="mock-btn">設定</button><button class="mock-btn" style="background:#00b4d8; color:#0e1117; border:none;">編集</button></div></div>', unsafe_allow_html=True)
 
-    # 🔴 スクリプトから検知しやすく、かつ横幅を100%固定するためのコンテナを st.markdown で宣言
-    st.markdown('<div class="log-scroll-area">', unsafe_allow_html=True)
+    # 🔴 ログ全体のコンテナ（CSSハック用のクラスを付与）
+    st.markdown('<div class="log-master-outer">', unsafe_allow_html=True)
 
-    # 2. 🔴 ログリストを表示
+    # ログリストの表示
     if os.path.exists(txt_path):
         with open(txt_path, "r", encoding="utf-8") as f:
             for idx, line in enumerate(f):
@@ -94,10 +91,9 @@ if available_folders:
                         st.session_state.auto_play = True
                         st.rerun()
 
-    # コンテナの閉じタグ
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # 3. 🔴【修正版】ホバー表示＆正確に動くカラーバークリック連動JavaScript
+    # 🔴【修正版JavaScript】確実に文字データを抽出して連動させるロジック
     st.markdown(
         """
         <script>
@@ -105,23 +101,24 @@ if available_folders:
         function clearHoverInfo(){var t=document.getElementById("colorbar-hover-info");t&&(t.innerText="バーにマウスを乗せてください",t.style.color="#8b949e")}
         
         function triggerLogClick(targetSec) {
-            const btns = document.querySelectorAll('div[data-testid="stButton"] button');
-            for (let btn of btns) {
-                if (btn.innerText.includes('[')) {
-                    // 表記を安全に分割。例: "[00:14]  MUSIC" -> "00:14"
-                    const rawTime = btn.innerText.split(']')[0].replace('[', '').trim();
+            // Streamlitのボタンが持つテキストを、最も安全な textContent から全検索
+            const buttons = document.querySelectorAll('div[data-testid="stButton"] button');
+            for (let btn of buttons) {
+                const txt = btn.textContent || btn.innerText || "";
+                if (txt.includes('[') && txt.includes(']')) {
+                    const rawTime = txt.split(']')[0].replace('[', '').trim();
                     const timeParts = rawTime.split(':');
                     let btnSec = 0;
                     
-                    // 配列のインデックスを正しく指定して計算を確実に成功させます
                     if (timeParts.length === 2) {
                         btnSec = parseInt(timeParts[0], 10) * 60 + parseInt(timeParts[1], 10);
                     } else if (timeParts.length === 3) {
                         btnSec = parseInt(timeParts[0], 10) * 3600 + parseInt(timeParts[1], 10) * 60 + parseInt(timeParts[2], 10);
                     }
                     
+                    // 秒数が合致したら身代わりクリックを発動
                     if (btnSec === targetSec) {
-                        btn.click(); // 完全一致したらログのボタンをキックして自動再生
+                        btn.click();
                         break;
                     }
                 }
@@ -132,41 +129,50 @@ if available_folders:
         unsafe_allow_html=True
     )
 
-    # 4. 🔴【修正版】外枠をテキストの長さに合わせて縮ませない、横幅100%固定のCSS
+    # 🔴【修正版CSS】外枠の縮み問題を根本解決し、全パーツを横幅100%に強制固定するルール
     st.markdown(
         """
         <style>
         .stApp { background-color: #0e1117 !important; color: #e2e8f0 !important; }
         .section-title { font-weight: bold; color: #ffffff; font-size: 16px; border-left: 4px solid #00b4d8; padding-left: 8px; margin-bottom: 8px; }
-        .player-panel { background-color: #161b22; border: 1px solid #00b4d8; border-radius: 8px; padding: 15px; margin-top: 10px; }
+        .player-panel { background-color: #161b22; border: 1px solid #00b4d8; border-radius: 8px; padding: 15px; margin-top: 10px; width: 100% !important; box-sizing: border-box; }
         .player-panel audio { width: 100%; filter: invert(0.9) hue-rotate(180deg); }
         .time-display-mock { text-align: right; color: #00b4d8; font-family: monospace; font-size: 14px; margin-top: 5px; }
         
-        .color-bar-container { display: flex; height: 18px; border-radius: 4px; overflow: hidden; border: 1px solid #00b4d8; margin-top: 5px; margin-bottom: 5px; background-color: #161b22; width: 100%; }
+        .color-bar-container { display: flex; height: 18px; border-radius: 4px; overflow: hidden; border: 1px solid #00b4d8; margin-top: 5px; margin-bottom: 5px; background-color: #161b22; width: 100% !important; box-sizing: border-box; }
         .bar-tick { flex: 1; height: 100%; cursor: pointer; }
         .bar-tick:hover { opacity: 0.4; background-color: #ffffff !important; }
 
-        /* 🔴 指定したログエリアのみを横幅100%固定のスクロール枠に変形。縮み問題を解決 */
-        div.log-scroll-area {
+        /* 🔴【最重要】ボタンを包むStreamlit標準の配置コンテナごと、幅100%のスクロール枠（画像通りの外枠）へ強制変形する */
+        div.log-master-outer {
             background-color: #161b22 !important;
             border: 1px solid #21262d !important;
             border-radius: 8px !important;
             padding: 10px !important;
             max-height: 380px !important;
             overflow-y: auto !important;
-            width: 100% !important; /* 横幅を完全に引き伸ばす */
+            width: 100% !important;
             display: block !important;
+            box-sizing: border-box;
         }
         
-        /* 内部の st.button 行も横幅を最大に引き伸ばす */
-        div.log-scroll-area div[data-testid="stButton"] { width: 100% !important; margin-bottom: 0px !important; display: block !important; }
-        div.log-scroll-area div[data-testid="stButton"] button {
+        /* 🔴 Streamlitの自動縮小コンテナを強制的に幅100%に引き伸ばす */
+        div.log-master-outer div[data-testid="element-container"],
+        div.log-master-outer div[data-testid="stButton"] { 
+            width: 100% !important; 
+            max-width: 100% !important;
+            margin-bottom: 0px !important; 
+            display: block !important; 
+        }
+        
+        div.log-master-outer div[data-testid="stButton"] button {
             width: 100% !important; background: transparent !important; border: none !important;
             color: #c9d1d9 !important; text-align: left !important; padding: 6px 12px !important;
             font-size: 14px !important; border-radius: 4px !important; justify-content: flex-start !important;
+            display: block !important;
         }
-        div.log-scroll-area div[data-testid="stButton"] button:hover { background-color: #21262d !important; color: #ffffff !important; }
-        div.log-scroll-area div[data-testid="stButton"] button::first-line { color: #00b4d8 !important; font-family: monospace !important; }
+        div.log-master-outer div[data-testid="stButton"] button:hover { background-color: #21262d !important; color: #ffffff !important; }
+        div.log-master-outer div[data-testid="stButton"] button::first-line { color: #00b4d8 !important; font-family: monospace !important; }
         
         .mock-btn { background: #21262d; color: #c9d1d9; border: 1px solid #30363d; padding: 4px 12px; border-radius: 4px; font-size: 13px; margin-left: 5px; }
         div[data-baseweb="select"] > div { background-color: #161b22 !important; border: 1px solid #30363d !important; color: white !important; }
