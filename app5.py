@@ -69,13 +69,14 @@ if available_folders:
     </body>
     </html>
     """
-
-    # プレイヤーの画面描画（高さをしっかり確保し、キーを変えることで確実に曲を切り替えます）
+    
     components.html(
         html_code,
         height=160,
-        key=f"player_{selected_folder}"
+        key="my_fixed_audio_player"  # 固定の文字列にするか、keyの行自体を消してもOKです
     )
 
 else:
     st.warning("`static` フォルダ内に有効な音声フォルダが見つかりません。")
+
+    
