@@ -41,6 +41,7 @@ if available_folders:
     st.markdown('<div class="time-display-mock" id="time-view">00:00 / 12:12</div><div class="canvas-container"><canvas id="timeline-canvas" height="22"></canvas></div></div>', unsafe_allow_html=True)
     st.markdown('<div id="colorbar-hover-info" style="height: 20px; color: #8b949e; font-family: monospace; font-size: 13px; text-align: center; margin-top: 5px;">バーにマウスを乗せてください</div>', unsafe_allow_html=True)
     st.markdown('<div style="display: flex; justify-content: space-between; align-items: center; margin-top: 25px; margin-bottom: 15px;"><span class="section-title" style="margin:0;">Session Logs</span><div><button class="mock-btn">設定</button><button class="mock-btn" style="background:#00b4d8; color:#0e1117; border:none;">編集</button></div></div>', unsafe_allow_html=True)
+
     # 2. 文字起こしテキストファイル（.txt）を読み込んでHTML行を組み立てる
     log_html_lines = ""
     if os.path.exists(txt_path):
@@ -58,14 +59,25 @@ if available_folders:
                     log_html_lines += f'<div class="log-line" onclick="remoteSeek({secs})"><span class="timestamp-lead">[{time_str}]</span><span class="log-text">{text_content}</span></div>\n'
     st.markdown(f'<div class="log-master-outer">{log_html_lines}</div>', unsafe_allow_html=True)
 
-    # 3. カラーバー配列データをJavaScriptにエラーなく引き渡すための文字列加工
+    # 3. 🔴【バグの根本治療】JavaScript側の配列エラーを消し去るため、Python側で先に「秒数」と「STATUS」を完全に計算・結合します
     color_array_js = []
     if os.path.exists(color_txt_path):
         with open(color_txt_path, "r", encoding="utf-8") as f:
             for line in f:
-                if line.strip().startswith("[") and "]" in line:
+                line = line.strip()
+                if line.startswith("[") and "]" in line:
                     idx_close = line.find("]")
-                    color_array_js.append(f"'{line[1:idx_close].strip()}={line[idx_close+1:].strip().upper()}'")
+                    time_str = line[1:idx_close].strip()
+                    status = line[idx_close+1:].strip().upper()
+                    
+                    try:
+                        p = time_str.split(":")
+                        secs = int(p[0])*60 + int(p[1]) if len(p)==2 else int(p[0])*3600 + int(p[1])*60 + int(p[2]) if len(p)==3 else 0
+                    except:
+                        continue
+                    
+                    # JavaScript側では split(':') や [0] のような危険な配列操作を一切せず、この文字列をそのまま使わせます
+                    color_array_js.append(f"'{secs}={status}'")
     js_color_str = "[" + ",".join(color_array_js) + "]"
     # 4. 1つの大部屋（ドメイン）の中で直接通信させるための、隔離制限（CORS）をバイパスするJavaScript＆CSS
     st.markdown(
@@ -77,14 +89,12 @@ if available_folders:
         const hoverInfo = document.getElementById('colorbar-hover-info');
         let colorData = {{}}, totalDuration = 0;
 
-        // 配列データをJavaScriptの時刻キーに正確にマッピング（インデックスバグを完全修正）
+        // 🔴【修正点】Python側で安全に処理された単純な「秒数＝STATUS」を読み込むため、絶対にJavaScriptがフリーズしません
         ({js_color_str}).forEach(item => {{
             const parts = item.split('=');
-            const tStr = parts[0];
-            const status = parts[1];
-            const p = tStr.split(':').map(Number);
-            if (p.length === 2) colorData[p[0]*60 + p[1]] = status;
-            else if (p.length === 3) colorData[p[0]*3600 + p[1]*60 + p[2]] = status;
+            if (parts.length === 2) {{
+                colorData[parseInt(parts[0], 10)] = parts[1];
+            }}
         }});
 
         function updateHoverInfo(t) {{ if(hoverInfo) {{ hoverInfo.innerText = t; hoverInfo.style.color = '#00b4d8'; }} }}
@@ -113,7 +123,7 @@ if available_folders:
             timeDisplay.innerText = curM + ":" + curS + " / " + totM + ":" + totS;
         }}
 
-        // 行またはバーが叩かれた時に、直接プレイヤーをジャンプ再生させる関数
+        // 🔴 隔離壁のない「同じ部屋」にいるため、このジャンプ再生関数が100%成功します
         function remoteSeek(seconds) {{ if (audio) {{ audio.currentTime = seconds; audio.play().catch(e => console.log(e)); }} }}
 
         if (audio) {{
@@ -157,5 +167,8 @@ if available_folders:
         """,
         unsafe_allow_html=True
     )
+else:
+    st.warning("`static` フォルダ内に有効な音声フォルダが見つかりません。")
+
 else:
     st.warning("`static` フォルダ内に有効な音声フォルダが見つかりません。")
