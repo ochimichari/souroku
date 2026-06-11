@@ -2,38 +2,65 @@ import os
 import streamlit as st
 import streamlit.components.v1 as components
 
-st.title("🎵 カスタムHTMLプレイヤー")
+st.title("🎵 カスタムHTMLプレイヤー (自動検索版)")
 
-# 1. 入力フォーム
-folder_name = st.text_input("フォルダ名を入力してください", value="20260607_airs")
+STATIC_DIR = "static"
 
-# 入力があり、かつ「_」が含まれている場合のみ動かす
-if folder_name and "_" in folder_name:
-    
-    # ファイル名切り出しルール (20260607_airs -> airs)
-    file_name = folder_name.split("_")[-1]
-    
-    # ブラウザがアクセスする用のURLパス
-    audio_url = f"/static/{folder_name}/{file_name}.m4a"
-    
-    # クラウドサーバー上の実際の物理パス（存在確認用）
-    # ※staticフォルダ内に音声がある前提です
-    physical_path = os.path.join("static", folder_name, f"{file_name}.m4a")
+# 1. static フォルダが存在しない場合は空のリストにする
+if not os.path.exists(STATIC_DIR):
+    os.makedirs(STATIC_DIR)
+    st.info(f"'{STATIC_DIR}' フォルダを作成しました。音声フォルダを配置してください。")
 
-    # サーバー上に本当にファイルがあるか確認
-    if os.path.exists(physical_path):
+# 2. static配下のフォルダを自動リサーチして、有効な音声フォルダの一覧を作る
+available_folders = []
+
+if os.path.exists(STATIC_DIR):
+    for folder in os.listdir(STATIC_DIR):
+        folder_path = os.path.join(STATIC_DIR, folder)
         
-        # HTMLファイルを読み込む（player.htmlに変更）
+        # ディレクトリ（フォルダ）である場合のみ処理
+        if os.path.isdir(folder_path):
+            # フォルダ名からファイル名を計算 (例: 20260607_airs -> airs)
+            if "_" in folder:
+                file_name = folder.split("_")[-1]
+            else:
+                file_name = folder
+                
+            # 実際に m4a ファイルが存在するかチェック
+            m4a_path = os.path.join(folder_path, f"{file_name}.m4a")
+            if os.path.exists(m4a_path):
+                available_folders.append(folder)
+
+# 3. 画面に選択肢（セレクトボックス）を表示
+if available_folders:
+    # 昇順で並び替え（日付順などに見やすくするため）
+    available_folders.sort()
+    
+    selected_folder = st.selectbox(
+        "再生する音声を選択してください", 
+        options=available_folders
+    )
+    
+    # 4. 選択されたフォルダからURLを特定
+    if "_" in selected_folder:
+        selected_file_name = selected_folder.split("_")[-1]
+    else:
+        selected_file_name = selected_folder
+        
+    audio_url = f"/static/{selected_folder}/{selected_file_name}.m4a"
+    
+    # 画面に現在選択中の情報を表示
+    st.caption(f"再生中: {selected_folder}/{selected_file_name}.m4a")
+
+    # 5. player.html を読み込んで埋め込み
+    if os.path.exists("player.html"):
         with open("player.html", "r", encoding="utf-8") as f:
             html_code = f.read()
 
-        # HTMLをブラウザにレンダリングし、同時にURLを安全に流し込む
         components.html(
             html_code + f"""
             <script>
-                // 変数に安全に代入
                 window.audioUrlFromPython = "{audio_url}";
-                // プレイヤーの読み込み関数を実行
                 if (typeof initPlayer === "function") {{
                     initPlayer();
                 }}
@@ -42,6 +69,6 @@ if folder_name and "_" in folder_name:
             height=200,
         )
     else:
-        st.error(f"⚠️ サーバ上にファイルが見つかりません。配置を再確認してください:\n`{physical_path}`")
+        st.error("⚠️ `player.html` が見つかりません。")
 else:
-    st.warning("有効なフォルダ名（例: 20260607_airs）を入力してください。")
+    st.warning("`static` フォルダ内に、有効な音声ファイル（フォルダ名と一致するm4a）が見つかりません。")
