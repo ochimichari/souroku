@@ -34,12 +34,12 @@ if available_folders:
     physical_path = os.path.join(STATIC_DIR, selected_folder, f"{file_name}.m4a")
     txt_path = os.path.join(STATIC_DIR, selected_folder, f"{file_name}.txt")
 
-    # 音声プレイヤー（start_timeとautoplayを公式連携）
+    # 音声プレイヤー
     st.markdown('<div class="player-panel">', unsafe_allow_html=True)
     st.audio(physical_path, format="audio/mp4", start_time=st.session_state.seek_seconds, autoplay=st.session_state.auto_play)
     st.markdown('<div class="time-display-mock">00:00 / 12:12</div></div>', unsafe_allow_html=True)
 
-    # 固定のカラーバー（デザインのみを再現していた状態に戻します）
+    # 固定のカラーバー（一番きれいに表示されていたデザインを再現）
     st.markdown('<div class="color-bar"><div style="flex: 2; background: #00b4d8;"></div><div style="flex: 1; background: #ff4b4b;"></div><div style="flex: 3; background: #00b4d8;"></div><div style="flex: 1; background: #ff4b4b;"></div><div style="flex: 1; background: #00b4d8;"></div></div>', unsafe_allow_html=True)
     
     # ログヘッダー
@@ -85,6 +85,7 @@ if available_folders:
         .log-container { background-color: #161b22; border: 1px solid #21262d; border-radius: 8px; padding: 10px; max-height: 380px; overflow-y: auto; }
         
         /* 四角いボタンを行全体のフラットな美しい文字起こしデザインに完全変形 */
+        div[data-testid="element-container"]:has(div[data-testid="stButton"]) { width: 100% !important; max-width: 100% !important; margin-bottom: 0px !important; }
         div[data-testid="stButton"] { width: 100% !important; margin-bottom: 2px !important; }
         div[data-testid="stButton"] button {
             width: 100% !important; background: transparent !important; border: none !important;
