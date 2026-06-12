@@ -105,3 +105,4 @@ if available_folders:
     )
 else:
     st.warning("`static` フォルダ内に有効な音声フォルダが見つかりません。")
+
