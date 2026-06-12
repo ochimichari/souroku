@@ -25,6 +25,12 @@ if available_folders:
     
     file_name = selected_folder.split("_")[-1] if "_" in selected_folder else selected_folder
     
+    # --- 修正ポイント：セッション状態の安全な初期化 ---
+    if "seek_seconds" not in st.session_state:
+        st.session_state.seek_seconds = 0
+    if "auto_play" not in st.session_state:
+        st.session_state.auto_play = False
+
     # ファイル切り替え時にタイマーを確実に0秒にクリア
     if "last_folder" not in st.session_state or st.session_state.last_folder != selected_folder:
         st.session_state.last_folder = selected_folder
@@ -40,7 +46,7 @@ if available_folders:
     st.audio(physical_path, format="audio/mp4", start_time=st.session_state.seek_seconds, autoplay=st.session_state.auto_play)
     st.markdown('<div class="time-display-mock">00:00 / 12:12</div></div>', unsafe_allow_html=True)
 
-    # --- 修正ポイント：JavaScriptを使わないCSSグラデーション方式のカラーバー ---
+    # --- CSSグラデーション方式のカラーバー ---
     gradient_steps = []
     if os.path.exists(color_path):
         with open(color_path, "r", encoding="utf-8") as f:
@@ -69,7 +75,6 @@ if available_folders:
 
     # 計算した背景色を適用したカラーバーをMarkdownで直接出力
     st.markdown(f'<div class="color-bar" style="{gradient_css}"></div>', unsafe_allow_html=True)
-    # ---------------------------------------------------------------------
     
     # ログヘッダー
     st.markdown('<div style="display: flex; justify-content: space-between; align-items: center; margin-top: 25px; margin-bottom: 15px;"><span class="section-title" style="margin:0;">Session Logs</span><div><button class="mock-btn">設定</button><button class="mock-btn" style="background:#00b4d8; color:#0e1117; border:none;">編集</button></div></div>', unsafe_allow_html=True)
