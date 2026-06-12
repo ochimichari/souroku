@@ -36,7 +36,6 @@ if folders:
     st.markdown('<div id="hover-info" style="height:20px;color:#8b949e;font-family:monospace;font-size:13px;text-align:center;margin-top:5px;">バーにマウスを乗せてください</div>', unsafe_allow_html=True)
     st.markdown('<div style="display:flex;justify-content:space-between;align-items:center;margin-top:25px;margin-bottom:15px;"><span class="section-title" style="margin:0;">Session Logs</span><div><button class="mock-btn">設定</button><button class="mock-btn" style="background:#00b4d8;color:#0e1117;border:none;">編集</button></div></div>', unsafe_allow_html=True)
 
-    # ログリスト表示（完全に動いている st.button 構造を 100% 維持）
     log_html = ""
     if os.path.exists(txt_p):
         with open(txt_p, "r", encoding="utf-8") as f:
@@ -46,13 +45,10 @@ if folders:
                     idx_close = line.find("]")
                     t_str, text = line[1:idx_close].strip(), line[idx_close+1:].strip()
                     p = t_str.split(":")
-                    s = int(p)*60 + int(p) if len(p)==2 else int(p)*3600 + int(p)*60 + int(p) if len(p)==3 else 0
+                    s = int(p[0])*60 + int(p[1]) if len(p)==2 else int(p[0])*3600 + int(p[1])*60 + int(p[2]) if len(p)==3 else 0
                     log_html += f'<div class="log-line" onclick="remoteSeek({s})"><span class="ts">[{t_str}]</span><span class="txt">{text}</span></div>\n'
     st.markdown(f'<div class="log-container">{log_html}</div>', unsafe_allow_html=True)
 
-    # 🔴【連動しない問題の完全解決】
-    # 後からデータを解析するのをやめます。Python側で「今のファイルの総再生秒数（総行数）」と
-    # 「1秒ずつキャンバスに直接色を敷き詰めるJavaScriptの描画命令そのもの」を毎回その場で組み立てます。
     draw_commands = []
     total_len = 0
     hover_map_js = []
@@ -68,14 +64,12 @@ if folders:
                 stt = line[idx_close+1:].strip().upper()
                 color = "#ff4b4b" if "SPEECH" in stt else "#00b4d8" if "MUSIC" in stt else "#2a3247"
                 
-                # 🔴 フォルダ切り替え時に、この「JavaScriptの描画コード」自体が物理的に入れ替わります
                 draw_commands.append(f"ctx.fillStyle = '{color}'; ctx.fillRect({idx} * secW, 0, secW + 0.6, canvas.height);")
                 hover_map_js.append(f"hMap[{idx}] = '[{t_str}] {stt}';")
 
     js_render_block = "\n".join(draw_commands)
     js_hover_block = "\n".join(hover_map_js)
 
-    # 🔴 %s 置換により、フォルダを変えた瞬間にスクリプトの内部データが100%新品に入れ替わります
     html_script_template = """
     <script>
     (function() {
@@ -86,7 +80,6 @@ if folders:
         const totalDuration = %d;
         let hMap = {};
 
-        // ホバー用テキストマップの注入
         %s
 
         function drawTimeline(currentSec = 0) {
@@ -96,10 +89,8 @@ if folders:
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             const secW = canvas.width / totalDuration;
             
-            // 🔴 Pythonから流し込まれた「このファイル専用の直書き着色命令」をノータイムで一撃実行
             %s
 
-            // 現在地のホワイトインジケーター線
             const indX = (currentSec / totalDuration) * canvas.width;
             ctx.fillStyle = "#ffffff";
             ctx.fillRect(indX - 1, 0, 2, canvas.height);
@@ -137,7 +128,6 @@ if folders:
         }
         window.addEventListener('resize', () => { if(audio) drawTimeline(Math.floor(audio.currentTime)); });
         
-        // 起動時・切替時に強制描画
         setTimeout(() => { drawTimeline(0); }, 50);
     })();
     </script>
@@ -145,7 +135,6 @@ if folders:
 
     st.markdown(html_script_template, unsafe_allow_html=True)
 
-    # 完璧に動いていたCSS（表示枠100%固定を死守）
     st.markdown(
         """
         <style>
@@ -176,9 +165,4 @@ if folders:
         unsafe_allow_html=True
     )
 else:
-    st.warning("static フォルダ内に有効な音声フォルダが見つかりません。")
-
-
-
-
-
+    st.warning("`static` フォルダ内に有効な音声フォルダが見つかりません。")
