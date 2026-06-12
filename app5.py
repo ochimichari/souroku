@@ -29,99 +29,47 @@ if available_folders:
     if "last_folder" not in st.session_state or st.session_state.last_folder != selected_folder:
         st.session_state.last_folder = selected_folder
         st.session_state.seek_seconds = 0
-        st.session_state.trigger_seek = False  # 前回の再生フラグをリセット
+        st.session_state.auto_play = False
 
     physical_path = os.path.join(STATIC_DIR, selected_folder, f"{file_name}.m4a")
     txt_path = os.path.join(STATIC_DIR, selected_folder, f"{file_name}.txt")
     color_path = os.path.join(STATIC_DIR, selected_folder, f"{file_name}_color.txt")
 
-    # 音声ファイルをバイナリとして読み込みベース64エンコード（元の動いていたロジック）
-    import base64
-    with open(physical_path, "rb") as audio_file:
-        audio_bytes = audio_file.read()
-    audio_base64 = base64.b64encode(audio_bytes).decode()
-
-    # JSシーク制御（元の動いていたロジック）
-    seek_js = ""
-    if st.session_state.trigger_seek:
-        seek_js = f"""
-        <script>
-            var audio = window.parent.document.getElementById("custom-audio-player");
-            if (audio) {{
-                audio.currentTime = {st.session_state.seek_seconds};
-                audio.play();
-            }}
-        </script>
-        """
-        st.session_state.trigger_seek = False
-
     # 音声プレイヤー
-    st.markdown(
-        f"""
-        <div class="player-panel">
-            <audio id="custom-audio-player" controls src="data:audio/mp4;base64,{audio_base64}" style="width:100%;"></audio>
-            {seek_js}
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
+    st.markdown('<div class="player-panel">', unsafe_allow_html=True)
+    st.audio(physical_path, format="audio/mp4", start_time=st.session_state.seek_seconds, autoplay=st.session_state.auto_play)
+    st.markdown('<div class="time-display-mock">00:00 / 12:12</div></div>', unsafe_allow_html=True)
 
-    # --- カラーバー描画部分（他のコードに影響を与えない独立型実装） ---
-    color_array_js = "[]"
+    # --- 修正ポイント：JavaScriptを使わないCSSグラデーション方式のカラーバー ---
+    gradient_steps = []
     if os.path.exists(color_path):
-        color_segments = []
         with open(color_path, "r", encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
-                if line.startswith("[") and "]" in line:
+            lines = [line.strip() for line in f if line.strip().startswith("[") and "]" in line]
+            total_lines = len(lines)
+            
+            if total_lines > 0:
+                for idx, line in enumerate(lines):
                     idx_close = line.find("]")
-                    time_str = line[1:idx_close].strip()
                     status = line[idx_close+1:].strip()
-                    
-                    try:
-                        p = time_str.split(":")
-                        if len(p) == 2: secs = int(p[0]) * 60 + int(p[1])
-                        elif len(p) == 3: secs = int(p[0]) * 3600 + int(p[1]) * 60 + int(p[2])
-                        else: secs = 0
-                    except ValueError: secs = 0
-                    
                     color = "#00b4d8" if status == "SPEECH" else "#ff4b4b"
-                    color_segments.append({"time": secs, "color": color})
-        
-        color_segments.sort(key=lambda x: x["time"])
-        color_array_js = str([seg["color"] for seg in color_segments])
+                    
+                    # 1秒ごとの区間をパーセンテージで計算
+                    start_pct = (idx / total_lines) * 100
+                    end_pct = ((idx + 1) / total_lines) * 100
+                    
+                    # 境界線がボケないようにソリッドな色の塊を作る
+                    gradient_steps.append(f"{color} {start_pct}%")
+                    gradient_steps.append(f"{color} {end_pct}%")
+                
+                gradient_css = f"background: linear-gradient(to right, {', '.join(gradient_steps)});"
+            else:
+                gradient_css = "background: #161b22;"
+    else:
+        gradient_css = "background: #161b22;"
 
-    # 独自のiframe風コンポーネントを用いて安全にCanvasを描画（親要素のJSを汚染しません）
-    st.components.v1.html(
-        f"""
-        <div style="width: 100%; height: 15px; border-radius: 4px; overflow: hidden; border: 1px solid #00b4d8; box-sizing: border-box; background: #161b22;">
-            <canvas id="bar-canvas" style="width: 100%; height: 100%; display: block;"></canvas>
-        </div>
-        <script>
-            (function() {{
-                var canvas = document.getElementById("bar-canvas");
-                if (!canvas) return;
-                var ctx = canvas.getContext("2d");
-                var colors = {color_array_js};
-                if (colors.length === 0) return;
-
-                // 描画バッファを画面サイズに同期
-                canvas.width = canvas.clientWidth;
-                canvas.height = canvas.clientHeight;
-
-                var totalPoints = colors.length;
-                var segmentWidth = canvas.width / totalPoints;
-
-                for (var i = 0; i < totalPoints; i++) {{
-                    ctx.fillStyle = colors[i];
-                    ctx.fillRect(Math.floor(i * segmentWidth), 0, Math.ceil(segmentWidth) + 1, canvas.height);
-                }}
-            }})();
-        </script>
-        """,
-        height=25,
-    )
-    # -----------------------------------------------------------------
+    # 計算した背景色を適用したカラーバーをMarkdownで直接出力
+    st.markdown(f'<div class="color-bar" style="{gradient_css}"></div>', unsafe_allow_html=True)
+    # ---------------------------------------------------------------------
     
     # ログヘッダー
     st.markdown('<div style="display: flex; justify-content: space-between; align-items: center; margin-top: 25px; margin-bottom: 15px;"><span class="section-title" style="margin:0;">Session Logs</span><div><button class="mock-btn">設定</button><button class="mock-btn" style="background:#00b4d8; color:#0e1117; border:none;">編集</button></div></div>', unsafe_allow_html=True)
@@ -147,7 +95,7 @@ if available_folders:
                     # 1行全体をひとつの st.button にし、CSSで文字起こし行に変形
                     if st.button(f"[{time_str}]  {text_content}", key=f"row_{secs}_{idx}"):
                         st.session_state.seek_seconds = secs
-                        st.session_state.trigger_seek = True  # 元の再生オンフラグ
+                        st.session_state.auto_play = True  # クリックされたら即座に再生ON
                         st.rerun()
     st.markdown('</div>', unsafe_allow_html=True)
 
@@ -159,6 +107,8 @@ if available_folders:
         .section-title { font-weight: bold; color: #ffffff; font-size: 16px; border-left: 4px solid #00b4d8; padding-left: 8px; margin-bottom: 8px; }
         .player-panel { background-color: #161b22; border: 1px solid #00b4d8; border-radius: 8px; padding: 15px; margin-top: 10px; width: 100% !important; }
         .player-panel audio { width: 100%; filter: invert(0.9) hue-rotate(180deg); }
+        .time-display-mock { text-align: right; color: #00b4d8; font-family: monospace; font-size: 14px; margin-top: 5px; }
+        .color-bar { display: flex; height: 15px; border-radius: 4px; overflow: hidden; border: 1px solid #00b4d8; margin-top: 15px; }
         
         /* ログコンテナ枠を横幅100%いっぱいに固定 */
         .log-container { background-color: #161b22; border: 1px solid #21262d; border-radius: 8px; padding: 10px; max-height: 380px; overflow-y: auto; }
